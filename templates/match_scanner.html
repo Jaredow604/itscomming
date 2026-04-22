@@ -1,0 +1,324 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Main Market Value Scanner | It's Coming</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Space+Grotesk:wght@700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --bg-card: #1e293b;
+            --accent-primary: #3b82f6; /* Blueish */
+            --accent-success: #10b981; /* Green */
+            --accent-warning: #f59e0b; /* Amber/Orange */
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+        
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 2rem;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 900px;
+        }
+
+        .header-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 2.5rem;
+            text-align: center;
+            margin-bottom: 2rem;
+            background: linear-gradient(to right, var(--accent-primary), #8b5cf6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .glass-panel {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            border: 1px solid var(--glass-border);
+            margin-bottom: 2rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+
+        .form-row.three-cols {
+            grid-template-columns: 1fr 1fr 1fr;
+        }
+
+        label {
+            display: block;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
+
+        input[type="text"], input[type="number"] {
+            width: 100%;
+            padding: 0.8rem;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--glass-border);
+            border-radius: 8px;
+            color: white;
+            font-size: 1rem;
+            outline: none;
+            transition: all 0.3s;
+            box-sizing: border-box;
+        }
+
+        input:focus {
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.3);
+        }
+
+        button {
+            width: 100%;
+            padding: 1rem;
+            background: linear-gradient(to right, var(--accent-primary), #2563eb);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 800;
+            font-family: 'Space Grotesk', sans-serif;
+            cursor: pointer;
+            text-transform: uppercase;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-top: 1rem;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(59, 130, 246, 0.5);
+        }
+
+        /* Results Area */
+        .results-container {
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        .match-header {
+            text-align: center;
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            color: #fff;
+        }
+
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: 100px 1fr 1fr 100px;
+            gap: 1rem;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            align-items: center;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .col-header {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            text-align: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .row-label {
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        .prob-value {
+            font-size: 1.25rem;
+            font-weight: 800;
+            text-align: center;
+            font-family: 'Space Grotesk', sans-serif;
+        }
+
+        .prob-ia { color: var(--accent-primary); }
+        .prob-casino { color: var(--text-muted); }
+
+        .edge-positive {
+            color: var(--accent-success);
+            text-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+        }
+        
+        .edge-negative {
+            color: #ef4444; /* Red */
+        }
+
+        .recommendation-box {
+            text-align: center;
+            padding: 1.5rem;
+            border-radius: 12px;
+            font-size: 1.25rem;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+            margin-top: 2rem;
+            border: 2px solid transparent;
+        }
+
+        .rec-success {
+            background: rgba(16, 185, 129, 0.1);
+            border-color: var(--accent-success);
+            color: var(--accent-success);
+            box-shadow: 0 0 25px rgba(16, 185, 129, 0.2);
+        }
+
+        .rec-danger {
+            background: rgba(239, 68, 68, 0.1);
+            border-color: #ef4444;
+            color: #ef4444;
+        }
+
+        .error-box {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid #ef4444;
+            color: #ef4444;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1 class="header-title">Main Market Scanner</h1>
+
+    <!-- Form Panel -->
+    <div class="glass-panel">
+        <form method="POST" action="">
+            {% csrf_token %}
+            
+            {% if error %}
+            <div class="error-box">
+                {{ error }}
+            </div>
+            {% endif %}
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Equipo Local</label>
+                    <input type="text" name="home_team" placeholder="Ej. Real Madrid" required value="{{ request.POST.home_team }}">
+                </div>
+                <div class="form-group">
+                    <label>Equipo Visitante</label>
+                    <input type="text" name="away_team" placeholder="Ej. Barcelona" required value="{{ request.POST.away_team }}">
+                </div>
+            </div>
+
+            <div class="form-row three-cols">
+                <div class="form-group">
+                    <label>Cuota Local (1)</label>
+                    <input type="number" step="0.01" name="odd_home" placeholder="2.10" required value="{{ request.POST.odd_home }}">
+                </div>
+                <div class="form-group">
+                    <label>Cuota Empate (X)</label>
+                    <input type="number" step="0.01" name="odd_draw" placeholder="3.50" required value="{{ request.POST.odd_draw }}">
+                </div>
+                <div class="form-group">
+                    <label>Cuota Visitante (2)</label>
+                    <input type="number" step="0.01" name="odd_away" placeholder="3.20" required value="{{ request.POST.odd_away }}">
+                </div>
+            </div>
+
+            <button type="submit">Ejecutar Escáner IA</button>
+        </form>
+    </div>
+
+    <!-- Results Panel -->
+    {% if resultado_partido %}
+    <div class="glass-panel results-container">
+        <div class="match-header">
+            {{ resultado_partido.home_team }} <span style="color: var(--text-muted);">vs</span> {{ resultado_partido.away_team }}
+        </div>
+
+        <!-- Headers for Grid -->
+        <div style="display: grid; grid-template-columns: 100px 1fr 1fr 100px; gap: 1rem; padding: 0 1rem;">
+            <div class="col-header">Resultado</div>
+            <div class="col-header">Prob. Casino</div>
+            <div class="col-header" style="color: var(--accent-primary);">Prob. Oráculo</div>
+            <div class="col-header">Edge</div>
+        </div>
+
+        <!-- HOME -->
+        <div class="comparison-grid">
+            <div class="row-label">Local (1)</div>
+            <div class="prob-value prob-casino">{{ resultado_partido.casino_home }}%</div>
+            <div class="prob-value prob-ia">{{ resultado_partido.ia_home }}%</div>
+            <div class="prob-value {% if resultado_partido.edge_home > 0 %}edge-positive{% else %}edge-negative{% endif %}">
+                {% if resultado_partido.edge_home > 0 %}+{% endif %}{{ resultado_partido.edge_home }}%
+            </div>
+        </div>
+
+        <!-- DRAW -->
+        <div class="comparison-grid">
+            <div class="row-label">Empate (X)</div>
+            <div class="prob-value prob-casino">{{ resultado_partido.casino_draw }}%</div>
+            <div class="prob-value prob-ia">{{ resultado_partido.ia_draw }}%</div>
+            <div class="prob-value {% if resultado_partido.edge_draw > 0 %}edge-positive{% else %}edge-negative{% endif %}">
+                {% if resultado_partido.edge_draw > 0 %}+{% endif %}{{ resultado_partido.edge_draw }}%
+            </div>
+        </div>
+
+        <!-- AWAY -->
+        <div class="comparison-grid">
+            <div class="row-label">Visita (2)</div>
+            <div class="prob-value prob-casino">{{ resultado_partido.casino_away }}%</div>
+            <div class="prob-value prob-ia">{{ resultado_partido.ia_away }}%</div>
+            <div class="prob-value {% if resultado_partido.edge_away > 0 %}edge-positive{% else %}edge-negative{% endif %}">
+                {% if resultado_partido.edge_away > 0 %}+{% endif %}{{ resultado_partido.edge_away }}%
+            </div>
+        </div>
+
+        <!-- RECOMMENDATION -->
+        <div class="recommendation-box {% if resultado_partido.hay_valor %}rec-success{% else %}rec-danger{% endif %}">
+            {{ resultado_partido.recomendacion }}
+        </div>
+    </div>
+    {% endif %}
+    
+</div>
+
+</body>
+</html>

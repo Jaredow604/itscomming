@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>It's Coming AI - Value Scanner</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Space+Grotesk:wght@400;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --bg-card: rgba(30, 41, 59, 0.7);
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --accent: #10b981;
+            --text-light: #f8fafc;
+            --text-muted: #94a3b8;
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        body {
+            background: radial-gradient(circle at top left, #1e1b4b, var(--bg-dark), #000000);
+            color: var(--text-light);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Orbes Decorativos Ambientales */
+        .glow-orb {
+            position: absolute;
+            width: 50vw;
+            height: 50vw;
+            max-width: 600px;
+            max-height: 600px;
+            background: var(--primary);
+            border-radius: 50%;
+            filter: blur(150px);
+            opacity: 0.15;
+            top: -10%;
+            left: -10%;
+            animation: pulse 12s infinite alternate;
+            z-index: 0;
+        }
+        
+        .glow-orb-2 {
+            position: absolute;
+            width: 40vw;
+            height: 40vw;
+            max-width: 500px;
+            max-height: 500px;
+            background: var(--accent);
+            border-radius: 50%;
+            filter: blur(120px);
+            opacity: 0.1;
+            bottom: -5%;
+            right: -5%;
+            animation: pulse 15s infinite alternate-reverse;
+            z-index: 0;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1) translate(0, 0); }
+            100% { transform: scale(1.05) translate(20px, 20px); }
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1100px;
+            padding: 2rem;
+            position: relative;
+            z-index: 10;
+        }
+
+        .header-title {
+            text-align: center;
+            margin-bottom: 3rem;
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 800;
+            font-size: clamp(2.5rem, 5vw, 4rem);
+            background: linear-gradient(135deg, #ffffff, #94a3b8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            letter-spacing: -1px;
+            animation: slideDown 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 2rem;
+        }
+
+        @media(min-width: 900px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr 1.2fr;
+                align-items: stretch;
+            }
+        }
+
+        /* Glassmorphism Cards */
+        .glass-card {
+            background: var(--bg-card);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 2.5rem;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            animation: fadeUp 1s ease both;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .glass-card:hover {
+            transform: translateY(-8px);
+            border-color: rgba(255,255,255,0.2);
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6), 0 0 40px rgba(59, 130, 246, 0.1);
+        }
+
+        h3.section-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.6rem;
+            margin-bottom: 2rem;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .section-title i {
+            color: var(--primary);
+            filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.6));
+        }
+
+        /* Formulario */
+        .form-group {
+            margin-bottom: 1.8rem;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 0.6rem;
+            color: var(--text-muted);
+            font-weight: 600;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+        }
+
+        .form-control {
+            width: 100%;
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid var(--glass-border);
+            color: #fff;
+            padding: 1.2rem 1.25rem;
+            border-radius: 14px;
+            font-size: 1.1rem;
+            transition: all 0.3s ease;
+            outline: none;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .form-control::placeholder {
+            color: rgba(148, 163, 184, 0.4);
+        }
+
+        .form-control:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15), inset 0 2px 4px rgba(0,0,0,0.2);
+            background: rgba(15, 23, 42, 0.95);
+        }
+
+        /* Botón Mágico */
+        .btn-submit {
+            width: 100%;
+            background: linear-gradient(135deg, var(--primary), #4f46e5);
+            color: #fff;
+            border: none;
+            padding: 1.2rem;
+            font-size: 1.1rem;
+            font-weight: 700;
+            font-family: 'Space Grotesk', sans-serif;
+            border-radius: 14px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 0 8px 20px rgba(59, 130, 246, 0.4);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            margin-top: 1rem;
+        }
+
+        .btn-submit:hover {
+            transform: translateY(-3px) scale(1.02);
+            box-shadow: 0 12px 25px rgba(59, 130, 246, 0.6);
+            background: linear-gradient(135deg, #6366f1, var(--primary));
+        }
+
+        .btn-submit:active {
+            transform: translateY(1px);
+            box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3);
+        }
+
+        /* Panel de Alertas */
+        .alert {
+            padding: 1.25rem;
+            border-radius: 12px;
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            color: #fca5a5;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-top: 2rem;
+            animation: fadeIn 0.4s ease;
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.2);
+        }
+
+        /* Panel de Resultados */
+        .result-header {
+            border-bottom: 2px dashed rgba(255,255,255,0.1);
+            padding-bottom: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .player-name {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 2.2rem;
+            font-weight: 800;
+            color: #fff;
+            margin-bottom: 0.3rem;
+            letter-spacing: -0.5px;
+        }
+
+        .player-team {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+            font-weight: 400;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .metric-box {
+            background: rgba(0,0,0,0.3);
+            border-radius: 18px;
+            padding: 1.8rem 1rem;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.08);
+            transition: transform 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .metric-box::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 2px;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+        }
+
+        .metric-label {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 0.8rem;
+            font-weight: 600;
+        }
+
+        .metric-value {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 3rem;
+            font-weight: 800;
+            color: #fff;
+            line-height: 1;
+        }
+
+        .metric-value.highlight {
+            color: var(--primary);
+            text-shadow: 0 0 25px rgba(59, 130, 246, 0.5);
+            background: linear-gradient(135deg, #fff, var(--primary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* Cintillo de Recomendación (Edge) */
+        .recommendation {
+            border-radius: 18px;
+            padding: 2rem;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            gap: 1.2rem;
+            position: relative;
+            z-index: 1;
+            box-shadow: inset 0 2px 20px rgba(0,0,0,0.2);
+        }
+
+        .rec-success {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(5, 150, 105, 0.25));
+            border: 1px solid rgba(16, 185, 129, 0.4);
+            box-shadow: 0 10px 30px rgba(16, 185, 129, 0.2);
+        }
+
+        .rec-warning {
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(217, 119, 6, 0.25));
+            border: 1px solid rgba(245, 158, 11, 0.4);
+            box-shadow: 0 10px 30px rgba(245, 158, 11, 0.2);
+        }
+
+        .edge-val {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.2rem;
+            color: rgba(255,255,255,0.8);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .edge-val strong {
+            font-size: 2.5rem;
+            color: #fff;
+            margin-left: 0.5rem;
+            letter-spacing: 0px;
+        }
+
+        .rec-action {
+            font-size: 1.8rem;
+            font-weight: 800;
+            letter-spacing: 2px;
+            font-family: 'Space Grotesk', sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+        }
+
+        .rec-success .rec-action { 
+            color: #34d399; 
+            text-shadow: 0 0 15px rgba(52, 211, 153, 0.4);
+        }
+        .rec-warning .rec-action { 
+            color: #fbbf24;
+            text-shadow: 0 0 15px rgba(251, 191, 36, 0.4); 
+        }
+
+        .fase-btns {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .fase-btns button {
+            flex: 1;
+            padding: 0.8rem;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            color: var(--text-muted);
+            border-radius: 10px;
+            font-family: 'Outfit', sans-serif;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .fase-btns button:hover {
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+        }
+
+        /* Animaciones */
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-40px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+    </style>
+</head>
+<body>
+
+    <!-- Orbes Ambientales -->
+    <div class="glow-orb"></div>
+    <div class="glow-orb-2"></div>
+
+    <div class="container">
+        <h1 class="header-title">It's Coming Algorithmic DB</h1>
+
+        <div class="dashboard-grid">
+            
+            <!-- Columna Izquierda: Parámetros -->
+            <div class="glass-card" style="animation-delay: 0.1s;">
+                <h3 class="section-title"><i class="fa-solid fa-microchip"></i> Parámetros de Inferencia</h3>
+                
+                <form method="POST">
+                    {% csrf_token %}
+                    <div class="form-group">
+                        <label for="jugador" class="form-label">Identidad del Jugador</label>
+                        <input type="text" class="form-control" id="jugador" name="jugador" required placeholder="Ej: Vinicius Júnior" autocomplete="off">
+                    </div>
+                    
+                    <div class="form-group mb-4">
+                        <label for="linea_casino" class="form-label">Línea del Bookmaker / Casino</label>
+                        <input type="number" step="0.5" class="form-control" id="linea_casino" name="linea_casino" required placeholder="10.5">
+                    </div>
+                    
+                    <button type="submit" class="btn-submit">
+                        <i class="fa-solid fa-bolt"></i> Ejecutar IA (PyTorch)
+                    </button>
+                    
+                    {% if error %}
+                    <div class="alert">
+                        <i class="fa-solid fa-circle-exclamation" style="font-size: 1.5rem;"></i>
+                        <span>{{ error }}</span>
+                    </div>
+                    {% endif %}
+                </form>
+            </div>
+
+            <!-- Columna Derecha: Resultado -->
+            <div class="glass-card" style="animation-delay: 0.3s; min-height: 480px;">
+                {% if resultado %}
+                    <div class="result-header">
+                        <div class="player-name">{{ resultado.nombre_real }}</div>
+                        <div class="player-team"><i class="fa-solid fa-shield"></i> {{ resultado.equipo }}</div>
+                    </div>
+                    
+                    <div class="metrics-grid">
+                        <div class="metric-box">
+                            <div class="metric-label">Línea Casino</div>
+                            <div class="metric-value">{{ resultado.linea_casino }}</div>
+                        </div>
+                        <div class="metric-box">
+                            <div class="metric-label">Proyección Neural</div>
+                            <div class="metric-value highlight">{{ resultado.ia_predict }}</div>
+                        </div>
+                    </div>
+                    
+                    <div class="recommendation {% if resultado.color == 'success' %}rec-success{% else %}rec-warning{% endif %}">
+                        <div class="edge-val">EDGE MATEMÁTICO: <strong>{% if resultado.edge > 0 %}+{% endif %}{{ resultado.edge }}</strong></div>
+                        <div class="rec-action">
+                            {% if resultado.color == 'success' %}<i class="fa-solid fa-arrow-trend-up"></i>{% else %}<i class="fa-solid fa-hand"></i>{% endif %}
+                            {{ resultado.recomendacion }}
+                        </div>
+                    </div>
+
+                    <div class="fase-btns">
+                        <button onclick="alert('Funcionalidad en construcción para la Fase 6'); return false;"><i class="fa-solid fa-chart-line"></i> Ver Tendencias</button>
+                        <button onclick="alert('Funcionalidad en construcción para la Fase 6'); return false;"><i class="fa-solid fa-user-astronaut"></i> Stats Jugador</button>
+                    </div>
+                {% else %}
+                    <div style="height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-muted); opacity: 0.3; gap: 1.5rem; text-align:center;">
+                        <i class="fa-solid fa-fingerprint" style="font-size: 6rem;"></i>
+                        <p style="font-size: 1.2rem; font-family:'Space Grotesk', sans-serif; font-weight:600;">Esperando parámetros para inyección de tensores...</p>
+                    </div>
+                {% endif %}
+            </div>
+
+        </div>
+    </div>
+
+</body>
+</html>

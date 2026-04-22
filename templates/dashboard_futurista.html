@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>It's Coming v2.0 - Command Center</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Space+Grotesk:wght@400;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            /* Base Theme (Dark Mode Quant) */
+            --bg-body: #020617;
+            --bg-glass: rgba(15, 23, 42, 0.7);
+            --bg-panel: rgba(15, 23, 42, 0.85);
+            --bg-chat: #0b111a;
+            --bg-header: #0f1520;
+            --bg-input: #0b111a;
+            --bg-user-msg: #1e293b;
+            --bg-ai-msg: rgba(0, 255, 204, 0.05);
+            
+            --border-glass: rgba(0, 240, 255, 0.2);
+            --border-chat: #1a2635;
+            
+            --cyber-cyan: #00F0FF;
+            --neon-green: #39FF14;
+            --crimson-red: #FF003C;
+            --accent-green: #00ffcc;
+            
+            --text-main: #F8FAFC;
+            --text-secondary: #94A3B8;
+            --text-input: #00ffcc;
+            --text-user-msg: #f8fafc;
+            --text-ai-msg: #e0e6ed;
+            
+            --shadow-glass: 0 10px 30px rgba(0, 0, 0, 0.5);
+            --glow-cyan: 0 0 15px var(--cyber-cyan);
+            
+            /* Background image */
+            --bg-image: linear-gradient(rgba(2, 6, 23, 0.8), rgba(2, 6, 23, 0.95)), url('https://images.unsplash.com/photo-1518605368461-1e1e1024b892?q=80&w=2000&auto=format&fit=crop');
+        }
+
+        [data-theme="light"] {
+            /* Light Mode Theme */
+            --bg-body: #f8fafc;
+            --bg-glass: rgba(255, 255, 255, 0.85);
+            --bg-panel: rgba(255, 255, 255, 0.95);
+            --bg-chat: #ffffff;
+            --bg-header: #f1f5f9;
+            --bg-input: #ffffff;
+            --bg-user-msg: #e2e8f0;
+            --bg-ai-msg: rgba(5, 150, 105, 0.08); /* Light green tint */
+            
+            --border-glass: rgba(0, 0, 0, 0.1);
+            --border-chat: #cbd5e1;
+            
+            --cyber-cyan: #0284c7; /* Darker cyan for text readability */
+            --neon-green: #16a34a; /* Darker green */
+            --crimson-red: #dc2626; /* Darker red */
+            --accent-green: #059669; /* Dark emerald for contrast */
+            
+            --text-main: #0f172a;
+            --text-secondary: #475569;
+            --text-input: #0f172a;
+            --text-user-msg: #0f172a;
+            --text-ai-msg: #0f172a;
+            
+            --shadow-glass: 0 10px 30px rgba(0, 0, 0, 0.05);
+            --glow-cyan: none;
+            
+            --bg-image: linear-gradient(rgba(248, 250, 252, 0.92), rgba(248, 250, 252, 0.98)), url('https://images.unsplash.com/photo-1518605368461-1e1e1024b892?q=80&w=2000&auto=format&fit=crop');
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Outfit', system-ui, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-body);
+            background-image: var(--bg-image);
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: background 0.3s ease, color 0.3s ease;
+        }
+
+        .main-header {
+            display: flex; justify-content: space-between; align-items: center; padding: 12px 32px;
+            background: var(--bg-panel); border-bottom: 1px solid var(--border-glass);
+            z-index: 100; backdrop-filter: blur(10px); box-shadow: var(--shadow-glass);
+        }
+
+        .logo { font-weight: 800; font-size: 1.5rem; color: var(--cyber-cyan); text-shadow: var(--glow-cyan); font-family: 'Space Grotesk', sans-serif; letter-spacing: 1px; }
+
+        .header-controls { display: flex; align-items: center; gap: 20px; }
+        
+        /* Theme Toggle Button */
+        .theme-toggle {
+            background: transparent; border: 1px solid var(--border-glass); color: var(--text-main);
+            padding: 8px 16px; border-radius: 20px; cursor: pointer; font-family: 'Space Grotesk', sans-serif;
+            font-weight: 600; display: flex; align-items: center; gap: 8px; transition: all 0.3s;
+        }
+        .theme-toggle:hover {
+            border-color: var(--cyber-cyan); box-shadow: 0 0 10px rgba(0, 240, 255, 0.2);
+        }
+        
+        .status-badge { color: var(--neon-green); font-size: 0.85rem; font-weight: 700; border: 1px solid var(--neon-green); padding: 6px 12px; border-radius: 20px; letter-spacing: 1px; box-shadow: inset 0 0 5px rgba(57, 255, 20, 0.2); }
+
+        .dashboard-grid {
+            display: grid; grid-template-columns: 300px 1fr 340px; gap: 24px;
+            padding: 24px 32px; height: calc(100vh - 65px);
+        }
+
+        .column-layout { display: flex; flex-direction: column; gap: 16px; overflow-y: auto; padding-right: 5px; }
+        
+        .glass-panel {
+            background: var(--bg-glass); backdrop-filter: blur(20px); border: 1px solid var(--border-glass); 
+            box-shadow: var(--shadow-glass); border-radius: 16px; padding: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .widget-title { color: var(--text-main); font-size: 1.1rem; text-transform: uppercase; letter-spacing: 1px; display: flex; justify-content: space-between; align-items: center; font-family: 'Space Grotesk', sans-serif; margin-bottom: 12px; border-bottom: 1px solid var(--border-glass); padding-bottom: 8px;}
+        .widget-title i { color: var(--cyber-cyan); }
+
+        /* Left Column: Partidos Hoy */
+        .match-card {
+            display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px;
+            background: var(--bg-body); padding: 15px; border-radius: 12px; border: 1px solid var(--border-glass);
+            transition: transform 0.2s;
+        }
+        .match-card:hover { transform: translateY(-2px); border-color: var(--cyber-cyan); box-shadow: var(--shadow-glass);}
+        .match-card:last-child { margin-bottom: 0; }
+        .match-teams { display: flex; justify-content: space-between; font-weight: 600; font-family: 'Space Grotesk', sans-serif; }
+        .match-odds { display: flex; gap: 8px; justify-content: space-between; font-size: 0.85rem; }
+        .odd-pill { background: var(--bg-header); border: 1px solid var(--border-chat); padding: 6px 4px; border-radius: 6px; flex: 1; text-align: center; color: var(--text-secondary); font-family: 'Courier New', monospace;}
+        .odd-pill strong { color: var(--text-main); display: block; margin-top: 4px; font-size: 1rem;}
+
+        /* Central Column: Chatbot */
+        .central-terminal { display: flex; flex-direction: column; height: 100%; padding: 0; background: var(--bg-panel); border: 1px solid var(--border-glass); border-radius: 16px; overflow: hidden; }
+        .terminal-header { background: var(--bg-header); padding: 15px 20px; border-bottom: 1px solid var(--border-chat); color: var(--accent-green); font-size: 0.95rem; font-weight: bold; display: flex; justify-content: space-between; font-family: 'Courier New', monospace; align-items:center; }
+        
+        .chat-area { flex-grow: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 15px; background: var(--bg-chat); scroll-behavior: smooth; font-family: 'Courier New', monospace;}
+        
+        .msg-bubble { max-width: 85%; padding: 12px 18px; border-radius: 6px; line-height: 1.6; font-size: 0.95rem; }
+        .msg-bot { align-self: flex-start; background: var(--bg-ai-msg); border-left: 3px solid var(--accent-green); color: var(--text-ai-msg); }
+        .msg-bot strong { color: var(--accent-green); }
+        .msg-user { align-self: flex-end; background: var(--bg-user-msg); border: 1px solid var(--border-chat); color: var(--text-user-msg); }
+        
+        .chat-form { display: flex; padding: 15px; background: var(--bg-header); border-top: 1px solid var(--border-chat); margin: 0; }
+        .chat-form input { flex: 1; background: var(--bg-input); border: 1px solid var(--border-chat); color: var(--text-input); padding: 12px; outline: none; border-radius: 4px 0 0 4px; font-family: 'Courier New', monospace; transition: border-color 0.2s;}
+        .chat-form input:focus { border-color: var(--accent-green); }
+        .chat-form button { background: transparent; border: 1px solid var(--accent-green); color: var(--accent-green); font-weight: bold; padding: 0 24px; cursor: pointer; border-radius: 0 4px 4px 0; transition: all 0.2s; font-family: 'Courier New', monospace; letter-spacing: 1px;}
+        .chat-form button:hover { background: var(--accent-green); color: var(--bg-chat); }
+        
+        /* Right Column Widgets */
+        .sharp-item { padding: 12px 10px; border-bottom: 1px dashed var(--border-glass); font-size: 0.9rem; }
+        .sharp-item:last-child { border-bottom: none; }
+        .sharp-drop { color: var(--crimson-red); font-weight: bold; font-family: 'Courier New', monospace; margin: 4px 0;}
+        
+        .kelly-form { display: flex; flex-direction: column; gap: 12px; }
+        .k-group { display: flex; flex-direction: column; gap: 6px;}
+        .k-label { font-size: 0.8rem; color: var(--text-secondary); font-weight: 600; letter-spacing: 1px;}
+        .k-input { background: var(--bg-input); border: 1px solid var(--border-chat); padding: 10px; border-radius: 6px; color: var(--text-main); font-family: 'Courier New', monospace; outline: none; transition: border 0.3s;}
+        .k-input:focus { border-color: var(--cyber-cyan); }
+        .k-btn { background: var(--bg-chat); color: var(--cyber-cyan); border: 1px solid var(--cyber-cyan); padding: 12px; border-radius: 6px; font-weight: bold; cursor: pointer; font-family: 'Space Grotesk', sans-serif; transition: all 0.2s; letter-spacing:1px;}
+        .k-btn:hover { background: var(--cyber-cyan); color: #fff; }
+        .k-result { margin-top: 10px; padding: 15px; background: var(--bg-body); border-radius: 6px; text-align: center; font-family: 'Courier New', monospace; border: 1px dashed var(--border-chat); color: var(--text-main); font-weight: bold;}
+
+        /* Scrollbars */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border-glass); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--cyber-cyan); }
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <header class="main-header">
+        <div class="logo">IT'S COMING <span style="font-size: 1rem; color: var(--text-secondary); text-shadow:none;">v2.0</span></div>
+        <div class="header-controls">
+            <button class="theme-toggle" id="themeToggleBtn">
+                <i class="fa-solid fa-moon"></i> <span>Dark</span>
+            </button>
+            <div class="status-badge">● ENGINE ONLINE</div>
+        </div>
+    </header>
+
+    <main class="dashboard-grid">
+        
+        <!-- Left: Partidos Hoy -->
+        <aside class="column-layout">
+            <div class="glass-panel">
+                <h3 class="widget-title">Partidos de Hoy <i class="fa-solid fa-calendar-day"></i></h3>
+                {% for sport, matches in schedule.items %}
+                    {% if sport == 'soccer' %}
+                    <div style="color: var(--text-main); font-family: 'Space Grotesk', sans-serif; font-size: 0.9rem; font-weight: bold; margin: 15px 0 8px 0; border-bottom: 1px solid var(--border-glass); padding-bottom: 4px;">
+                        <i class="fa-solid fa-futbol" style="color: var(--cyber-cyan);"></i> Fútbol
+                    </div>
+                    {% elif sport == 'nba' %}
+                    <div style="color: var(--text-main); font-family: 'Space Grotesk', sans-serif; font-size: 0.9rem; font-weight: bold; margin: 15px 0 8px 0; border-bottom: 1px solid var(--border-glass); padding-bottom: 4px;">
+                        <i class="fa-solid fa-basketball" style="color: var(--neon-green);"></i> NBA
+                    </div>
+                    {% elif sport == 'mlb' %}
+                    <div style="color: var(--text-main); font-family: 'Space Grotesk', sans-serif; font-size: 0.9rem; font-weight: bold; margin: 15px 0 8px 0; border-bottom: 1px solid var(--border-glass); padding-bottom: 4px;">
+                        <i class="fa-solid fa-baseball" style="color: var(--crimson-red);"></i> MLB
+                    </div>
+                    {% endif %}
+
+                    {% for match in matches %}
+                    <div class="match-card" style="transition: all 0.2s ease; cursor: pointer;">
+                        <div style="font-size: 0.75rem; color: var(--cyber-cyan); text-align: center; margin-bottom: 4px; font-weight: bold; letter-spacing: 1px;"><i class="fa-regular fa-clock"></i> {{ match.time }}</div>
+                        <div class="match-teams"><span style="color: var(--text-main);">{{ match.home }}</span><span style="color: var(--text-secondary);">vs</span><span style="color: var(--text-main);">{{ match.away }}</span></div>
+                        <div class="match-odds" style="margin-top: 8px;">
+                            {% if sport == 'soccer' %}
+                            <div class="odd-pill">1 <strong style="color: var(--cyber-cyan);">{{ match.odds_1 }}</strong></div>
+                            <div class="odd-pill">X <strong style="color: var(--text-main);">{{ match.odds_x }}</strong></div>
+                            <div class="odd-pill">2 <strong style="color: var(--crimson-red);">{{ match.odds_2 }}</strong></div>
+                            {% else %}
+                            <div class="odd-pill">H <strong style="color: var(--neon-green);">{{ match.odds_h }}</strong></div>
+                            <div class="odd-pill">A <strong style="color: var(--crimson-red);">{{ match.odds_a }}</strong></div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% endfor %}
+            </div>
+        </aside>
+
+        <!-- Center: SPORTIQ Assistant -->
+        <section class="central-terminal">
+            <div class="terminal-header">
+                <span>>_ SPORTIQ ASSISTANT // ORÁCULO</span>
+                <span class="status-badge" style="padding: 2px 8px; font-size: 0.7rem;">QUANT MODE</span>
+            </div>
+
+            <div id="chat-messages-area" class="chat-area">
+                <div class="msg-bubble msg-bot">
+                    Conexión Múltiple DB establecida.<br>
+                    Esperando orden de análisis 360º (Ej: 'Real Madrid vs Alavés')...
+                </div>
+            </div>
+
+            <div id="sportiq-loading" style="display: none; padding: 0 20px 10px; color: var(--accent-green); background: var(--bg-chat); font-size: 0.8rem; font-style: italic; font-family: 'Courier New', monospace;">
+                Procesando matrices 360º...
+            </div>
+
+            <form id="sportiq-chat-form" class="chat-form">
+                {% csrf_token %}
+                <input type="text" id="quant-user-input" placeholder="Comando quant..." autocomplete="off">
+                <button type="submit">RUN</button>
+            </form>
+        </section>
+
+        <!-- Right: Insights Quant -->
+        <aside class="column-layout">
+            
+            <div class="glass-panel">
+                <h3 class="widget-title">Sharp Money Tracker <i class="fa-solid fa-arrow-trend-down"></i></h3>
+                <div class="sharp-item">
+                    <div>Arsenal ML (EPL)</div>
+                    <div class="sharp-drop">Drop 15% (2.10 ➔ 1.78)</div>
+                    <div style="font-size: 0.8rem; color: var(--text-secondary);">Volumen inusual detectado P.M.</div>
+                </div>
+                <div class="sharp-item">
+                    <div>Real Madrid Over 2.5 (LaLiga)</div>
+                    <div class="sharp-drop">Drop 10% (1.65 ➔ 1.48)</div>
+                    <div style="font-size: 0.8rem; color: var(--text-secondary);">Flujo institucional alto</div>
+                </div>
+            </div>
+
+            <div class="glass-panel">
+                <h3 class="widget-title">Kelly Calculator <i class="fa-solid fa-calculator"></i></h3>
+                <form id="kellyForm" class="kelly-form">
+                    <div class="k-group">
+                        <label class="k-label">Bankroll ($)</label>
+                        <input type="number" id="kBankroll" class="k-input" placeholder="1000" required>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <div class="k-group" style="flex:1;">
+                            <label class="k-label">Line (Dec)</label>
+                            <input type="number" step="0.01" id="kOdds" class="k-input" placeholder="2.10" required>
+                        </div>
+                        <div class="k-group" style="flex:1;">
+                            <label class="k-label">Win Prob (%)</label>
+                            <input type="number" id="kProb" class="k-input" placeholder="55" required>
+                        </div>
+                    </div>
+                    <button type="button" class="k-btn" onclick="calculateKelly()">CALCULAR %</button>
+                    <div class="k-result" id="kResult">Monto Kelly: --</div>
+                </form>
+            </div>
+            
+        </aside>
+
+    </main>
+
+    <script>
+        // 1. Theme Toggle Logic
+        const themeBtn = document.getElementById('themeToggleBtn');
+        const themeIcon = themeBtn.querySelector('i');
+        const themeText = themeBtn.querySelector('span');
+        
+        function setTheme(theme) {
+            if (theme === 'light') {
+                document.documentElement.setAttribute('data-theme', 'light');
+                themeIcon.className = 'fa-solid fa-sun';
+                themeText.textContent = 'Light';
+                localStorage.setItem('quantTheme', 'light');
+            } else {
+                document.documentElement.removeAttribute('data-theme');
+                themeIcon.className = 'fa-solid fa-moon';
+                themeText.textContent = 'Dark';
+                localStorage.setItem('quantTheme', 'dark');
+            }
+        }
+
+        const savedTheme = localStorage.getItem('quantTheme') || 'dark';
+        setTheme(savedTheme);
+
+        themeBtn.addEventListener('click', () => {
+            const currentTheme = document.documentElement.getAttribute('data-theme');
+            setTheme(currentTheme === 'light' ? 'dark' : 'light');
+        });
+
+        // 2. Kelly Criterion Calculator
+        function calculateKelly() {
+            const bankroll = parseFloat(document.getElementById('kBankroll').value);
+            const odds = parseFloat(document.getElementById('kOdds').value);
+            const probPercent = parseFloat(document.getElementById('kProb').value);
+
+            if (!odds || !probPercent || odds <= 1) {
+                document.getElementById('kResult').textContent = "Inputs inválidos";
+                return;
+            }
+
+            const p = probPercent / 100;
+            const q = 1 - p;
+            const b = odds - 1;
+
+            const kellyFraction = ( (b * p) - q ) / b;
+            
+            const reqEl = document.getElementById('kResult');
+            if (kellyFraction <= 0) {
+                reqEl.innerHTML = "<span style='color: var(--crimson-red);'>NO BET (Edge Negativo)</span>";
+            } else {
+                const stake = bankroll ? (kellyFraction * bankroll).toFixed(2) : '--';
+                reqEl.innerHTML = `Stake Sugerido: <span style="color: var(--accent-green);">${(kellyFraction * 100).toFixed(2)}%</span> <br><small>Monto a Invertir: $${stake}</small>`;
+            }
+        }
+
+        // 3. Chatbot Logic (Django Fetch API)
+        document.addEventListener('DOMContentLoaded', () => {
+            const chatForm = document.getElementById('sportiq-chat-form');
+            if(!chatForm) return;
+
+            const inputField = document.getElementById('quant-user-input');
+            const chatArea = document.getElementById('chat-messages-area');
+            const loadingUI = document.getElementById('sportiq-loading');
+
+            function appendMessage(rawText, isBot) {
+                const msgDiv = document.createElement('div');
+                msgDiv.className = isBot ? 'msg-bubble msg-bot' : 'msg-bubble msg-user';
+                
+                if (isBot) {
+                    let cleanHTML = rawText
+                        .replace(/\n/g, '<br>')
+                        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                    msgDiv.innerHTML = cleanHTML;
+                } else {
+                    msgDiv.innerHTML = rawText.replace(/\n/g, '<br>');
+                }
+
+                chatArea.appendChild(msgDiv);
+                chatArea.scrollTop = chatArea.scrollHeight;
+            }
+
+            chatForm.addEventListener('submit', async (e) => {
+                e.preventDefault(); 
+                
+                const userInput = inputField.value.trim();
+                if (!userInput) return;
+
+                appendMessage(userInput, false);
+                inputField.value = '';
+                
+                loadingUI.style.display = 'block';
+                chatArea.scrollTop = chatArea.scrollHeight;
+
+                try {
+                    const response = await fetch('/api/chat/lcel/', {
+                        method: 'POST',
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]') ? document.querySelector('[name=csrfmiddlewaretoken]').value : ''
+                        },
+                        body: JSON.stringify({ message: userInput })
+                    });
+
+                    const data = await response.json();
+                    
+                    loadingUI.style.display = 'none';
+                    if (data.reply) {
+                        appendMessage(data.reply, true);
+                    } else if (data.error) {
+                        appendMessage("❌ ERROR DE SISTEMA: " + data.error, true);
+                    }
+                } catch (error) {
+                    loadingUI.style.display = 'none';
+                    appendMessage("💥 CAÍDA EN LA CONEXIÓN: No hay respuesta del backend quant.", true);
+                    console.error(error);
+                }
+            });
+        });
+        
+        // 4. Auto-Refresh Componente Live (10 min = 600,000 ms)
+        setTimeout(() => {
+            console.log("Auto-refreshing dashboard for live odds/matches updates...");
+            window.location.reload();
+        }, 600000);
+    </script>
+</body>
+</html>

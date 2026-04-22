@@ -1,0 +1,195 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>It's Coming | PRO Panel</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@300;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --bg: #090e1a; --card: #131a2f; --neon: #0ea5e9; }
+        body { background: var(--bg); color: #f1f5f9; font-family: 'Chakra Petch', sans-serif; margin: 0; height: 100vh; display: flex; flex-direction: column; }
+        .dashboard { display: grid; grid-template-columns: 300px 1fr 300px; gap: 20px; padding: 20px; flex-grow: 1; overflow: hidden; }
+        .card-custom { background: var(--card); border: 1px solid #2d3748; border-radius: 15px; padding: 20px; display: flex; flex-direction: column; }
+        #chat-box { flex-grow: 1; overflow-y: auto; margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px; padding: 10px; border-radius: 8px; background: rgba(0,0,0,0.2); }
+        .msg { padding: 10px 15px; border-radius: 10px; font-size: 0.9em; max-width: 85%; word-wrap: break-word; }
+        .ai-msg { background: #1e293b; align-self: flex-start; border-left: 3px solid var(--neon); }
+        .user-msg { background: var(--neon); color: white; align-self: flex-end; }
+        .btn-neon { background: var(--neon); color: white; font-weight: bold; border: none; padding: 10px 20px; border-radius: 8px; }
+        input { background: #0c1221 !important; border: 1px solid #2d3748 !important; color: white !important; }
+    </style>
+</head>
+<body>
+
+<div class="p-3 border-bottom border-secondary d-flex justify-content-between align-items-center">
+    <h4 class="m-0">⚽ IT'S COMING <span class="text-info" style="font-size: 0.6em;">v1.7 PRO</span></h4>
+    <span class="badge bg-success">H2H & PANDAS ACTIVE</span>
+</div>
+
+<div class="dashboard">
+    <div class="card-custom">
+        <h6 class="text-muted">HISTORIAL RECIENTE</h6>
+        <div class="small mt-2">Cargando datos de 5 temporadas...</div>
+    </div>
+
+    <div class="card-custom" style="border: 1px solid var(--neon);">
+        <div id="chat-box">
+            <div class="msg ai-msg">Analista listo. Escribe un equipo para calcular su probabilidad con Poisson + H2H.</div>
+        </div>
+        <div class="d-flex gap-2">
+            <input type="text" id="user-input" class="form-control" placeholder="Ej: Liverpool...">
+            <button class="btn btn-neon" id="btn-analizar">ANALIZAR</button>
+        </div>
+    </div>
+
+   <div class="card-custom">
+    <h6 class="text-muted text-uppercase mb-3">🔥 Betting Edge</h6>
+    <div id="confidence-area">
+        <div class="d-flex justify-content-between mb-1">
+            <small>Nivel de Confianza</small>
+            <small id="conf-level" class="text-info">ESPERANDO...</small>
+        </div>
+        <div class="progress" style="height: 12px; background: #0c1221; border: 1px solid #2d3748;">
+            <div id="conf-bar" class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%; background: var(--neon);"></div>
+        </div>
+        <p class="mt-3 small text-muted">El modelo está procesando Poisson + H2H + Momentum en tiempo real.</p>
+    </div>
+</div>
+</div>
+
+<script>
+    // Usamos esta forma para evitar errores de "not defined"
+    window.onload = function() {
+        const btn = document.getElementById('btn-analizar');
+        const input = document.getElementById('user-input');
+        const chatBox = document.getElementById('chat-box');
+
+        async function ejecutarAnalisis() {
+            const query = input.value.trim();
+            if (!query) return;
+
+            chatBox.innerHTML += `<div class="msg user-msg">${query}</div>`;
+            input.value = '';
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            try {
+                const response = await fetch('/api/chatbot-web/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: query })
+                });
+                const data = await response.json();
+                chatBox.innerHTML += `<div class="msg ai-msg">${data.reply}</div>`;
+            } catch (error) {
+                chatBox.innerHTML += `<div class="msg ai-msg text-danger">Error conectando con la IA.</div>`;
+            }
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        btn.onclick = ejecutarAnalisis;
+        input.onkeypress = function(e) {
+            if (e.keyCode === 13) ejecutarAnalisis();
+        };
+    };
+</script>
+<script>
+    async function enviarMensaje() {
+        const input = document.getElementById('user-input');
+        const chatBox = document.getElementById('chat-box');
+        const confBar = document.getElementById('conf-bar');
+        const confLevel = document.getElementById('conf-level');
+        const val = input.value.trim();
+        if(!val) return;
+
+        chatBox.innerHTML += `<div class="msg user-msg">${val}</div>`;
+        input.value = '';
+
+        try {
+            const res = await fetch('/api/chatbot-web/', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({message: val})
+            });
+            const data = await res.json();
+            
+            chatBox.innerHTML += `<div class="msg ai-msg">${data.reply}</div>`;
+            
+            // ACTUALIZACIÓN DINÁMICA DEL DASHBOARD
+            if(data.confidence) {
+                confLevel.innerText = data.confidence;
+                confBar.style.width = data.prob + '%';
+                confBar.style.backgroundColor = data.confidence === 'ALTA' ? '#00ff88' : '#0ea5e9';
+            }
+        } catch(e) {
+            chatBox.innerHTML += `<div class="msg ai-msg text-danger">Error en el enlace neuronal.</div>`;
+        }
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+</script>
+<style>
+    :root { 
+        --bg: #090e1a; 
+        --card: #131a2f; 
+        --neon: #0ea5e9; 
+    }
+
+    /* Permitimos que el body respire, pero limitamos la altura */
+    body { 
+        background: var(--bg); 
+        color: #f1f5f9; 
+        font-family: 'Chakra Petch', sans-serif; 
+        margin: 0; 
+        height: 100vh; 
+        display: flex; 
+        flex-direction: column;
+        overflow: hidden; /* Mantenemos el dashboard estático */
+    }
+
+    /* El contenedor principal debe ocupar el resto de la pantalla */
+    .dashboard { 
+        display: grid; 
+        grid-template-columns: 300px 1fr 300px; 
+        gap: 20px; 
+        padding: 20px; 
+        flex: 1; /* Ocupa el espacio disponible */
+        min-height: 0; /* IMPORTANTE: Permite que los hijos se encojan y activen scroll */
+    }
+
+    .card-custom { 
+        background: var(--card); 
+        border: 1px solid #2d3748; 
+        border-radius: 15px; 
+        padding: 20px; 
+        display: flex; 
+        flex-direction: column; 
+        height: 100%; /* Ocupa todo el alto de su celda en el grid */
+        overflow: hidden; 
+    }
+
+    /* El Chat Box es el que debe scrollear */
+    #chat-box { 
+        flex: 1; 
+        overflow-y: auto; 
+        margin-bottom: 15px; 
+        display: flex; 
+        flex-direction: column; 
+        gap: 12px; 
+        padding: 15px; 
+        background: rgba(0,0,0,0.2);
+        border-radius: 10px;
+        /* Estilo del scrollbar (tipo Dark Mode) */
+        scrollbar-width: thin;
+        scrollbar-color: #2d3748 transparent;
+    }
+
+    #chat-box::-webkit-scrollbar { width: 6px; }
+    #chat-box::-webkit-scrollbar-thumb { background: #2d3748; border-radius: 10px; }
+
+    .msg { padding: 12px 16px; border-radius: 12px; font-size: 0.95em; max-width: 90%; line-height: 1.4; }
+    .ai-msg { background: #1e293b; align-self: flex-start; border-left: 4px solid var(--neon); }
+    .user-msg { background: var(--neon); color: white; align-self: flex-end; font-weight: 500; }
+    
+    .input-area { margin-top: auto; padding-top: 10px; }
+</style>
+</body>
+</html>
