@@ -11,5 +11,17 @@ env/
 __pycache__/
 *.pyc
 
-# Base de datos local (por si acaso tienes alguna de prueba)
+# Base de datos local
 db.sqlite3
+
+# Logs
+*.log
+
+# Lock files (download artifacts)
+downloaded_files/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo

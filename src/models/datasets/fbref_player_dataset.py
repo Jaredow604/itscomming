@@ -5,6 +5,21 @@ import pandas as pd
 import numpy as np
 from torch.utils.data import Dataset
 from sqlalchemy import create_engine
+from rapidfuzz import process, fuzz
+import logging
+
+import sys
+import django
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..')))
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'core.settings')
+if not django.apps.apps.ready:
+    django.setup()
+
+from predicciones.entity_resolver import clean_team_name
+
+logging.basicConfig(level=logging.DEBUG, format='%(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 class FBrefPlayerDataset(Dataset):
     """
@@ -19,6 +34,7 @@ class FBrefPlayerDataset(Dataset):
         # 1. Carga de BD
         engine = create_engine(db_url)
         df_db = pd.read_sql_table('fbref_player_stats', engine)
+        logger.debug(f"Registros extraídos de DB (fbref_player_stats): {len(df_db)}")
         
         # 2. Carga de CSVs (Robusta)
         csv_pattern = os.path.join(data_dir, 'shooting_*.csv')
@@ -27,17 +43,12 @@ class FBrefPlayerDataset(Dataset):
         if not csv_files:
             raise FileNotFoundError(f"No se encontraron archivos CSV con el patrón {csv_pattern}")
             
-        # Itera sobre los archivos y lee saltando la primera fila basura (header=1)
         df_csv_list = [pd.read_csv(f, header=1) for f in csv_files]
         df_csv = pd.concat(df_csv_list, ignore_index=True)
         
-        # Elimina las filas donde el nombre del jugador sea literalmente "Player"
         df_csv = df_csv[df_csv['Player'] != 'Player']
-        
-        # Quita nulos en la columna Player
         df_csv = df_csv.dropna(subset=['Player'])
         
-        # Renombra las columnas
         df_csv = df_csv.rename(columns={
             'Player': 'nombre_jugador',
             'Squad': 'team_name',
@@ -45,24 +56,94 @@ class FBrefPlayerDataset(Dataset):
             'SoT': 'Standard_SoT'
         })
         
-        # Convierte métricas a formato numérico y rellena nulos con 0
         df_csv['Total_Shots'] = pd.to_numeric(df_csv['Total_Shots'], errors='coerce').fillna(0)
         df_csv['Standard_SoT'] = pd.to_numeric(df_csv['Standard_SoT'], errors='coerce').fillna(0)
         
-        # 3. Fusión (Merge)
-        # Inner join sobre ['nombre_jugador', 'team_name']
-        df = pd.merge(df_db, df_csv, on=['nombre_jugador', 'team_name'], how='inner')
+        logger.debug(f"Registros extraídos de CSV (shooting stats): {len(df_csv)}")
         
+        # --- NUEVO: Resolución de Entidades con RapidFuzz ---
+        logger.debug("Iniciando mapeo de entidades (Fuzzy Matching) con RapidFuzz...")
+        db_names = df_db['nombre_jugador'].dropna().unique().tolist()
+        csv_names = df_csv['nombre_jugador'].dropna().unique().tolist()
+        
+        mapping_dict = {}
+        for csv_name in csv_names:
+            # Buscamos la mejor coincidencia en la DB usando token_sort_ratio
+            match = process.extractOne(
+                csv_name, 
+                db_names, 
+                scorer=fuzz.token_sort_ratio, 
+                score_cutoff=85.0
+            )
+            if match:
+                mapping_dict[csv_name] = match[0]
+                
+        logger.debug(f"Matches exitosos con RapidFuzz (>85%): {len(mapping_dict)} de {len(csv_names)} jugadores únicos en CSV.")
+        
+        # Estandarizar la columna de nombres en el CSV
+        df_csv['nombre_jugador'] = df_csv['nombre_jugador'].replace(mapping_dict)
+        
+        # --- NUEVO: Resolución de Entidades de Equipos con RapidFuzz + clean_team_name ---
+        logger.debug("Iniciando mapeo de EQUIPOS (Fuzzy Matching + clean_team_name) con RapidFuzz...")
+        db_teams = df_db['team_name'].dropna().unique().tolist()
+        csv_teams = df_csv['team_name'].dropna().unique().tolist()
+        df_csv['team_name'] = df_csv['team_name'].astype(str).apply(clean_team_name)
+        df_db['team_name'] = df_db['team_name'].astype(str).apply(clean_team_name)
+        
+        # Pre-computar nombres limpios de la DB
+        db_teams_clean = {clean_team_name(t): t for t in db_teams}
+        db_cleaned_list = list(db_teams_clean.keys())
+        
+        team_mapping_dict = {}
+        for csv_team in csv_teams:
+            csv_team_clean = clean_team_name(csv_team)
+            
+            # Buscamos usando la versión limpia
+            match = process.extractOne(
+                csv_team_clean, 
+                db_cleaned_list, 
+                scorer=fuzz.token_sort_ratio, 
+                score_cutoff=85.0
+            )
+            if match:
+                clean_match = match[0]
+                original_db_team = db_teams_clean[clean_match]
+                team_mapping_dict[csv_team] = original_db_team
+                
+        logger.debug(f"Matches de equipos exitosos (>85% con limpieza): {len(team_mapping_dict)} de {len(csv_teams)} equipos únicos en CSV.")
+        df_csv['team_name'] = df_csv['team_name'].replace(team_mapping_dict)
+        
+        # 3. Fusión (Merge) - Cambiado a LEFT JOIN
+        df = pd.merge(df_db, df_csv, on=['nombre_jugador', 'team_name'], how='left')
+        logger.debug(f"Registros tras el LEFT JOIN (DB + CSV): {len(df)}")
+        
+        # Manejo de Residuos: Eliminar aquellos que no cruzaron y tienen nulo en estadísticas clave
+        # Ya que es LEFT JOIN, las stats que venían del CSV estarán nulas si no hizo match.
+        nulos_tras_cruce = df['Total_Shots'].isna().sum()
+        logger.debug(f"Residuos detectados tras el cruce (no superaron Fuzzy Match): {nulos_tras_cruce}")
+        
+        if nulos_tras_cruce > 0:
+            df = df.dropna(subset=['Total_Shots', 'Standard_SoT'])
+            logger.debug(f"Registros tras purgar residuos (dropna): {len(df)}")
+            
         # 4. Limpieza Final
-        # Convierte los minutos a numérico por seguridad y rellena posibles nulos adicionales
         if "Playing Time_Min" in df.columns:
             df['Playing Time_Min'] = pd.to_numeric(df['Playing Time_Min'], errors='coerce')
+            
+            # Count nulls before filling
+            nulos_previos = df['Playing Time_Min'].isna().sum()
+            logger.debug(f"Registros nulos detectados en 'Playing Time_Min': {nulos_previos}")
+            
+            # Instead of dropna, we fill with median or zero
             df = df.fillna(0)
-            # Filtra solo jugadores activos
+            logger.debug(f"Registros tras limpieza de Nulos (fillna(0)): {len(df)}")
+            
+            # Filtro de jugadores activos (elimina los que tienen 0 min, o sea los nulos que rellenamos con 0)
             df = df[df['Playing Time_Min'] > 0]
+            logger.debug(f"Registros efectivos (Playing Time > 0): {len(df)}")
         else:
             df = df.fillna(0)
-            print("Advertencia: No se detectó 'Playing Time_Min' en la tabla. Ignorando filtro principal.")
+            logger.debug("Advertencia: No se detectó 'Playing Time_Min' en la tabla. Ignorando filtro principal.")
             
         df = df.reset_index(drop=True)
         

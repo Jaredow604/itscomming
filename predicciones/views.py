@@ -26,29 +26,36 @@ from src.models.datasets.fbref_player_dataset import FBrefPlayerDataset
 from src.models.networks.match_prediction_net import MatchPredictionNet
 
 # 1. CONFIGURACIÓN (Seguridad vía variables de entorno)
-ODDS_API_KEY = os.getenv("ODDS_API_KEY", "dee3f700e79c237daf0a98fb20d77822")
+ODDS_API_KEY = os.getenv("ODDS_API_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 if GEMINI_API_KEY:
     client = genai.Client(api_key=GEMINI_API_KEY)
 else:
     client = None
-    print("⚠️ ADVERTENCIA: No se encontró GEMINI_API_KEY en el entorno. Chatbot IA funcionará limitado.")
+    print("[WARNING] No se encontro GEMINI_API_KEY en el entorno. Chatbot IA funcionara limitado.")
 
 # 2. SE ELIMINÓ LA CLASE LOCAL FootballOracleNet, AHORA IMPORTAMOS MatchPredictionNet DESDE LA ARQUITECTURA GENERAL
 
 # 3. CARGAR EL "CEREBRO" GLOBALMENTE
 try:
-    MODELO_IA = MatchPredictionNet(input_dim=6)
-    MODELO_IA.load_state_dict(torch.load('oracle_h2h_brain.pth', weights_only=True))
-    MODELO_IA.eval() 
-    print("🧠 Cerebro H2H PyTorch (MatchPredictionNet) cargado exitosamente.")
+    MODELO_IA = MatchPredictionNet(input_dim=12) # actualizado a v2
+    if os.path.exists('oracle_h2h_brain.pth'):
+        try:
+            MODELO_IA.load_state_dict(torch.load('oracle_h2h_brain.pth', map_location='cpu', weights_only=True))
+            MODELO_IA.eval() 
+            print("[OK] Cerebro H2H PyTorch (MatchPredictionNet) cargado exitosamente en views.py.")
+        except Exception as e:
+            print(f"[WARNING] No se pudo cargar oracle_h2h_brain.pth en views.py (arquitectura distinta): {e}")
+            MODELO_IA = None
+    else:
+        MODELO_IA = None
 except Exception as e:
-    print(f"Error cargando oracle_h2h_brain.pth: {e}")
+    print(f"Error instanciando MatchPredictionNet en views.py: {e}")
     MODELO_IA = None
 
 # --- CARGA GLOBAL VALUE BETTING ---
-DB_URL_VALUE = "postgresql://postgres:Jk9oe@localhost:5432/itscoming_db"
+DB_URL_VALUE = os.getenv("DB_URL", "postgresql://postgres:Jk9oe@localhost:5432/itscoming_db")
 try:
     DATASET_GLOBAL = FBrefPlayerDataset(db_url=DB_URL_VALUE, feature_cols=['Playing Time_Min', 'Total_Shots', 'Standard_SoT'])
     
@@ -62,9 +69,9 @@ try:
     if os.path.exists(ruta_modelo):
         MODELO_VALUE.load_state_dict(torch.load(ruta_modelo, map_location=torch.device('cpu')))
         MODELO_VALUE.eval()
-        print("✅ Red Neuronal (PlayerPropNet) Cacheada Exitosamente.")
+        print("[OK] Red Neuronal (PlayerPropNet) Cacheada Exitosamente.")
     else:
-        print(f"⚠️ ¡Atención! No ubicamos los pesos del modelo en: {ruta_modelo}")
+        print(f"[WARNING] No ubicamos los pesos del modelo en: {ruta_modelo}")
         MODELO_VALUE = None
 except Exception as e:
     DATASET_GLOBAL = None
@@ -79,9 +86,9 @@ try:
         
     MATCH_MODEL = joblib.load(match_model_path)
     engine_match = create_engine(DB_URL_VALUE)
-    print("✅ Motor Random Forest de Main Market (Match) cargado Exitosamente.")
+    print("[OK] Motor Random Forest de Main Market (Match) cargado Exitosamente.")
 except Exception as e:
-    print(f"⚠️ ¡Atención! No ubicamos el Cerebro RandomForest: {e}")
+    print(f"[WARNING] No ubicamos el Cerebro RandomForest: {e}")
     MATCH_MODEL = None
     engine_match = None
 
@@ -117,44 +124,31 @@ def home(request):
                 # Format time string gracefully
                 time_str = p.start_time.strftime('%H:%M') if p.start_time else '--:--'
                 
-                # We inject random logic for odds just to fill the 1x2/ML format required by the UI for the MVP demo
+                # Fetching real odds requires odds integration, setting to 0 for now
                 if p.sport == 'soccer':
                     todays_schedule['soccer'].append({
                         'time': time_str, 'home': p.home_team, 'away': p.away_team,
-                        'odds_1': round(random.uniform(1.8, 2.5), 2), 
-                        'odds_x': round(random.uniform(3.0, 3.6), 2), 
-                        'odds_2': round(random.uniform(2.8, 4.5), 2)
+                        'odds_1': 0, 
+                        'odds_x': 0, 
+                        'odds_2': 0
                     })
                 elif p.sport == 'nba':
                     todays_schedule['nba'].append({
                         'time': time_str, 'home': p.home_team, 'away': p.away_team,
-                        'odds_h': round(random.uniform(1.4, 2.1), 2), 
-                        'odds_a': round(random.uniform(1.7, 2.8), 2)
+                        'odds_h': 0, 
+                        'odds_a': 0
                     })
                 elif p.sport == 'mlb':
                     todays_schedule['mlb'].append({
                         'time': time_str, 'home': p.home_team, 'away': p.away_team,
-                        'odds_h': round(random.uniform(1.6, 2.3), 2), 
-                        'odds_a': round(random.uniform(1.6, 2.3), 2)
+                        'odds_h': 0, 
+                        'odds_a': 0
                     })
         else:
-            raise Exception("DailySchedule empty for today. Fallback triggered.")
+            print("DailySchedule empty for today. No matches to show.")
             
     except Exception as e:
-        print(f"Fallback UI Data Triggered: {e}")
-        todays_schedule = {
-            'soccer': [
-                {'time': '13:00', 'home': 'Real Madrid', 'away': 'Atlético Madrid', 'odds_1': 2.05, 'odds_x': 3.40, 'odds_2': 3.80},
-                {'time': '15:30', 'home': 'Man City', 'away': 'Arsenal', 'odds_1': 1.85, 'odds_x': 3.60, 'odds_2': 4.20}
-            ],
-            'nba': [
-                {'time': '18:30', 'home': 'Celtics', 'away': 'Heat', 'odds_h': 1.45, 'odds_a': 2.80},
-                {'time': '21:00', 'home': 'Lakers', 'away': 'Nuggets', 'odds_h': 2.10, 'odds_a': 1.75}
-            ],
-            'mlb': [
-                {'time': '19:05', 'home': 'Dodgers', 'away': 'Padres', 'odds_h': 1.65, 'odds_a': 2.30}
-            ]
-        }
+        print(f"Error fetching schedule: {e}")
     
     context = {'active_tab': 'chatbot', 'schedule': todays_schedule} # default state
     

@@ -30,17 +30,51 @@ def consultar_prediccion_partido(home_team: str, away_team: str) -> str:
 @tool
 def consultar_prediccion_totales(home_team: str, away_team: str) -> str:
     """Útil para consultar cuántos goles habrá (Over/Under 2.5)."""
-    return f"RESULTADO: {home_team} vs {away_team} -> La IA espera 3.28 goles. Recomienda OVER 2.5 con Edge del +3.10%."
+    try:
+        engine = create_engine("postgresql://postgres:Jk9oe@localhost:5432/itscoming_db")
+        query = f"SELECT total_goals FROM ml_match_features WHERE home_team ILIKE '%%{home_team}%%' OR away_team ILIKE '%%{away_team}%%' ORDER BY date DESC LIMIT 5"
+        df = pd.read_sql(query, engine)
+        if df.empty:
+            return f"No encontré registros recientes de goles totales para {home_team} o {away_team}."
+        promedio = df['total_goals'].mean()
+        recomendacion = "OVER 2.5" if promedio > 2.5 else "UNDER 2.5"
+        return f"RESULTADO: {home_team} vs {away_team} -> Según los últimos registros, promedian {promedio:.2f} goles. Sugerencia estadística: {recomendacion}."
+    except Exception as e:
+        return f"Error consultando totales: {str(e)}"
 
 @tool
 def consultar_mercados_secundarios(home_team: str, away_team: str) -> str:
-    """Útil para consultar promedios esperados de Córners y Tarjetas."""
-    return f"MERCADOS SECUNDARIOS: {home_team} vs {away_team} -> Línea proyectada: 9.5 Córners, 4.5 Tarjetas Amarillas. Edge en el Over de Córners a favor de {home_team}: +5.2%."
+    """Útil para consultar promedios esperados de Tiros a Puerta (Shots on Target)."""
+    try:
+        engine = create_engine("postgresql://postgres:Jk9oe@localhost:5432/itscoming_db")
+        query = f"SELECT team, \"Standard_Sh\", \"Standard_SoT\" FROM fbref_team_stats WHERE team ILIKE '%%{home_team}%%' OR team ILIKE '%%{away_team}%%' LIMIT 2"
+        df = pd.read_sql(query, engine)
+        if df.empty:
+            return f"No hay datos de mercados secundarios para {home_team} o {away_team}."
+        
+        resultado = []
+        for _, row in df.iterrows():
+            resultado.append(f"{row['team']} promedia {row['Standard_Sh']} Tiros y {row['Standard_SoT']} Tiros a Puerta")
+        return f"MERCADOS SECUNDARIOS: {home_team} vs {away_team} -> " + " | ".join(resultado) + "."
+    except Exception as e:
+        return f"Error consultando mercados secundarios: {str(e)}"
 
 @tool
 def consultar_player_props(home_team: str, away_team: str) -> str:
-    """Útil para consultar pronósticos individuales de jugadores (Player Props) con valor matemático."""
-    return f"PLAYER PROPS: {home_team} vs {away_team} -> Atacante principal de {home_team} Over 1.5 Tiros a Puerta - Edge +8%."
+    """Útil para consultar estadísticas individuales de jugadores con valor matemático."""
+    try:
+        engine = create_engine("postgresql://postgres:Jk9oe@localhost:5432/itscoming_db")
+        query = f"SELECT nombre_jugador, team_name, \"Performance_Gls\", \"Performance_Ast\" FROM fbref_player_stats WHERE team_name ILIKE '%%{home_team}%%' OR team_name ILIKE '%%{away_team}%%' ORDER BY \"Performance_Gls\" DESC LIMIT 2"
+        df = pd.read_sql(query, engine)
+        if df.empty:
+            return f"No encontré registros de jugadores para {home_team} o {away_team}."
+        
+        top = []
+        for _, row in df.iterrows():
+            top.append(f"{row['nombre_jugador']} ({row['team_name']}) con {row['Performance_Gls']} Goles y {row['Performance_Ast']} Asistencias")
+        return f"PLAYER PROPS: {home_team} vs {away_team} -> Los jugadores más peligrosos son: " + ", ".join(top) + "."
+    except Exception as e:
+        return f"Error consultando player props: {str(e)}"
 
 # Diccionario interno para poder llamar a las funciones por su nombre
 herramientas = [

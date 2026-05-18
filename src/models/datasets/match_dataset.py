@@ -53,12 +53,7 @@ class MatchDataset(Dataset):
             
             # Fallback a Dummy Data si no hay partidos jugados
             if df.empty:
-                print("ADVERTENCIA: No se encontraron partidos jugados. Invocando Pipeline con Mock Data de calibración.")
-                df = pd.DataFrame([
-                    {'l_goles': 2.5, 'l_tiros': 5.5, 'l_corners': 7.0, 'v_goles': 0.8, 'v_tiros': 2.0, 'v_corners': 3.0, 'goles_local': 3, 'goles_visitante': 0, 'local_nombre': 'Dummy L1', 'visita_nombre': 'Dummy V1'},
-                    {'l_goles': 1.1, 'l_tiros': 3.0, 'l_corners': 4.0, 'v_goles': 1.1, 'v_tiros': 3.5, 'v_corners': 4.5, 'goles_local': 1, 'goles_visitante': 1, 'local_nombre': 'Dummy L2', 'visita_nombre': 'Dummy V2'},
-                    {'l_goles': 0.5, 'l_tiros': 2.0, 'l_corners': 2.0, 'v_goles': 2.8, 'v_tiros': 6.0, 'v_corners': 6.5, 'goles_local': 0, 'goles_visitante': 2, 'local_nombre': 'Dummy L3', 'visita_nombre': 'Dummy V3'}
-                ])
+                raise ValueError("ADVERTENCIA: No se encontraron partidos jugados en la base de datos. El Pipeline requiere datos reales.")
                 
             self.metadata = df[['local_nombre', 'visita_nombre']].copy()
             

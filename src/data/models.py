@@ -14,7 +14,7 @@ class Base(DeclarativeBase):
     pass
 
 # ==========================================
-# DEFINICIÓN DE MODELOS (TABLAS)
+# DEFINICIÓN DE MODELOS (TABLAS CORE)
 # ==========================================
 
 class Team(Base):
@@ -23,6 +23,7 @@ class Team(Base):
     # ID extraído directo desde la API de 365Scores (autoincrement=False)
     id_equipo: Mapped[int] = mapped_column(primary_key=True, autoincrement=False)
     nombre: Mapped[str] = mapped_column(String(100), nullable=False)
+    liga: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     
     # Métricas y Promedios Críticos (Numeric 5,2 ideal para floats monetarios o xG)
     prom_corners: Mapped[Optional[float]] = mapped_column(Numeric(5, 2))
@@ -38,7 +39,6 @@ class Team(Base):
         back_populates="equipo",
         cascade="all, delete-orphan"
     )
-
 
 class Player(Base):
     __tablename__ = 'jugadores'
@@ -64,7 +64,6 @@ class Player(Base):
     stats_mlb: Mapped[List["PlayerStatsMLB"]] = relationship(back_populates="jugador", cascade="all, delete-orphan")
     stats_futbol: Mapped[List["PlayerStatsFutbol"]] = relationship(back_populates="jugador", cascade="all, delete-orphan")
 
-
 class Match(Base):
     __tablename__ = 'partidos'
 
@@ -80,7 +79,6 @@ class Match(Base):
     fstatus: Mapped[str] = mapped_column(String(50)) # Ej: "Ended", "Postponed", "Fixture"
 
     # Relaciones específicas debido a la doble FK
-    # Permite hacer cosas como: partido.local.prom_goles o partido.visitante.nombre
     local: Mapped["Team"] = relationship(foreign_keys=[id_local])
     visitante: Mapped["Team"] = relationship(foreign_keys=[id_visitante])
     
@@ -100,44 +98,29 @@ class Match(Base):
 
 class MatchStatsNBA(Base):
     __tablename__ = 'stats_nba'
-
-    # Actúa como Primary Key y Foreign Key bidireccional
     id_partido: Mapped[int] = mapped_column(ForeignKey("partidos.id_partido"), primary_key=True)
-    
-    # Métricas
     puntos_local: Mapped[int] = mapped_column(Integer, default=0)
     puntos_visitante: Mapped[int] = mapped_column(Integer, default=0)
     rebotes_local: Mapped[int] = mapped_column(Integer, default=0)
     rebotes_visitante: Mapped[int] = mapped_column(Integer, default=0)
     triples_local: Mapped[int] = mapped_column(Integer, default=0)
     triples_visitante: Mapped[int] = mapped_column(Integer, default=0)
-
-    # Relación Inversa al Partido
     partido: Mapped["Match"] = relationship(back_populates="stats_nba")
 
 class MatchStatsMLB(Base):
     __tablename__ = 'stats_mlb'
-
     id_partido: Mapped[int] = mapped_column(ForeignKey("partidos.id_partido"), primary_key=True)
-    
-    # Métricas
     carreras_local: Mapped[int] = mapped_column(Integer, default=0)
     carreras_visitante: Mapped[int] = mapped_column(Integer, default=0)
     hits_local: Mapped[int] = mapped_column(Integer, default=0)
     hits_visitante: Mapped[int] = mapped_column(Integer, default=0)
     errores_local: Mapped[int] = mapped_column(Integer, default=0)
     errores_visitante: Mapped[int] = mapped_column(Integer, default=0)
-
-    # Relación Inversa al Partido
     partido: Mapped["Match"] = relationship(back_populates="stats_mlb")
 
 class MatchStatsFutbol(Base):
     __tablename__ = 'stats_futbol'
-
-    # Actúa como Primary Key y Foreign Key bidireccional
     id_partido: Mapped[int] = mapped_column(ForeignKey("partidos.id_partido"), primary_key=True)
-    
-    # Métricas de Partido Enteras
     goles_local: Mapped[int] = mapped_column(Integer, default=0)
     goles_visitante: Mapped[int] = mapped_column(Integer, default=0)
     posesion_local: Mapped[int] = mapped_column(Integer, default=0)
@@ -150,12 +133,8 @@ class MatchStatsFutbol(Base):
     amarillas_visitante: Mapped[int] = mapped_column(Integer, default=0)
     rojas_local: Mapped[int] = mapped_column(Integer, default=0)
     rojas_visitante: Mapped[int] = mapped_column(Integer, default=0)
-
-    # Métricas Decimales Avanzadas (Machine Learning Focus)
     xg_local: Mapped[Optional[float]] = mapped_column(Numeric(5, 2))
     xg_visitante: Mapped[Optional[float]] = mapped_column(Numeric(5, 2))
-
-    # Relación Inversa al Partido
     partido: Mapped["Match"] = relationship(back_populates="stats_futbol")
 
 # ==========================================
@@ -164,11 +143,8 @@ class MatchStatsFutbol(Base):
 
 class PlayerStatsNBA(Base):
     __tablename__ = 'stats_jugador_nba'
-
     id_partido: Mapped[int] = mapped_column(ForeignKey("partidos.id_partido"), primary_key=True)
     id_jugador: Mapped[int] = mapped_column(ForeignKey("jugadores.id_jugador"), primary_key=True)
-
-    # Métricas Específicas Player Props NBA
     minutos: Mapped[int] = mapped_column(Integer, default=0)
     puntos: Mapped[int] = mapped_column(Integer, default=0)
     rebotes: Mapped[int] = mapped_column(Integer, default=0)
@@ -177,18 +153,13 @@ class PlayerStatsNBA(Base):
     bloqueos: Mapped[int] = mapped_column(Integer, default=0)
     perdidas: Mapped[int] = mapped_column(Integer, default=0)
     triples: Mapped[int] = mapped_column(Integer, default=0)
-
-    # Relaciones Inversas (Uno a Muchos a Tablas Core)
     partido: Mapped["Match"] = relationship(back_populates="jugadores_nba")
     jugador: Mapped["Player"] = relationship(back_populates="stats_nba")
 
 class PlayerStatsMLB(Base):
     __tablename__ = 'stats_jugador_mlb'
-
     id_partido: Mapped[int] = mapped_column(ForeignKey("partidos.id_partido"), primary_key=True)
     id_jugador: Mapped[int] = mapped_column(ForeignKey("jugadores.id_jugador"), primary_key=True)
-
-    # Métricas Específicas Player Props MLB
     turnos_al_bate: Mapped[int] = mapped_column(Integer, default=0)
     hits: Mapped[int] = mapped_column(Integer, default=0)
     carreras: Mapped[int] = mapped_column(Integer, default=0)
@@ -196,18 +167,13 @@ class PlayerStatsMLB(Base):
     carreras_impulsadas: Mapped[int] = mapped_column(Integer, default=0)
     bases_por_bolas: Mapped[int] = mapped_column(Integer, default=0)
     ponches: Mapped[int] = mapped_column(Integer, default=0)
-
-    # Relaciones Inversas (Uno a Muchos a Tablas Core)
     partido: Mapped["Match"] = relationship(back_populates="jugadores_mlb")
     jugador: Mapped["Player"] = relationship(back_populates="stats_mlb")
 
-
 class PlayerStatsFutbol(Base):
     __tablename__ = 'stats_jugador_futbol'
-
     id_partido: Mapped[int] = mapped_column(ForeignKey("partidos.id_partido"), primary_key=True)
     id_jugador: Mapped[int] = mapped_column(ForeignKey("jugadores.id_jugador"), primary_key=True)
-
     minutos: Mapped[int] = mapped_column(Integer, default=0)
     goles: Mapped[int] = mapped_column(Integer, default=0)
     asistencias: Mapped[int] = mapped_column(Integer, default=0)
@@ -217,37 +183,172 @@ class PlayerStatsFutbol(Base):
     faltas_cometidas: Mapped[int] = mapped_column(Integer, default=0)
     amarillas: Mapped[int] = mapped_column(Integer, default=0)
     rojas: Mapped[int] = mapped_column(Integer, default=0)
-
-    # Relaciones Inversas (Uno a Muchos a Tablas Core)
     partido: Mapped["Match"] = relationship(back_populates="jugadores_futbol")
     jugador: Mapped["Player"] = relationship(back_populates="stats_futbol")
 
 class LeagueTable(Base):
     __tablename__ = 'tabla_general'
-
     id_tabla: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     id_equipo: Mapped[int] = mapped_column(ForeignKey("equipos.id_equipo"))
-    
-    # Estadísticas Globales del Torneo
     puntos: Mapped[int] = mapped_column(Integer, default=0)
     dif_goles: Mapped[int] = mapped_column(Integer, default=0)
     partidos_jugados: Mapped[int] = mapped_column(Integer, default=0)
-
-    # Relación directa al equipo
     equipo: Mapped["Team"] = relationship(back_populates="tabla")
 
+# ==========================================
+# MODELOS DE DATOS CRUDOS (RAW DATA)
+# ==========================================
+
+class FBrefTeamStats(Base):
+    __tablename__ = 'fbref_team_stats'
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    league: Mapped[Optional[str]] = mapped_column(String(100))
+    season: Mapped[Optional[str]] = mapped_column(String(50))
+    team: Mapped[Optional[str]] = mapped_column(String(100))
+    
+    equipo_fk: Mapped[Optional[int]] = mapped_column(ForeignKey("equipos.id_equipo"), nullable=True)
+    equipo: Mapped[Optional["Team"]] = relationship()
+
+class FBrefPlayerStats(Base):
+    __tablename__ = 'fbref_player_stats'
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    nombre_jugador: Mapped[Optional[str]] = mapped_column(String(100))
+    team_name: Mapped[Optional[str]] = mapped_column(String(100))
+    
+    jugador_fk: Mapped[Optional[int]] = mapped_column(ForeignKey("jugadores.id_jugador"), nullable=True)
+    equipo_fk: Mapped[Optional[int]] = mapped_column(ForeignKey("equipos.id_equipo"), nullable=True)
+    
+    jugador: Mapped[Optional["Player"]] = relationship()
+    equipo: Mapped[Optional["Team"]] = relationship()
+
+class NBAPlayerHistory(Base):
+    __tablename__ = 'nba_player_history'
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    season_year: Mapped[Optional[str]] = mapped_column(String(50))
+    player_id: Mapped[Optional[int]] = mapped_column(Integer)
+    player_name: Mapped[Optional[str]] = mapped_column(String(100))
+    team_id: Mapped[Optional[int]] = mapped_column(Integer)
+    team_abbreviation: Mapped[Optional[str]] = mapped_column(String(10))
+    team_name: Mapped[Optional[str]] = mapped_column(String(100))
+    game_id: Mapped[Optional[str]] = mapped_column(String(50))
+    game_date: Mapped[Optional[str]] = mapped_column(String(50))
+    matchup: Mapped[Optional[str]] = mapped_column(String(100))
+    
+    jugador_fk: Mapped[Optional[int]] = mapped_column(ForeignKey("jugadores.id_jugador"), nullable=True)
+    equipo_fk: Mapped[Optional[int]] = mapped_column(ForeignKey("equipos.id_equipo"), nullable=True)
+    partido_fk: Mapped[Optional[int]] = mapped_column(ForeignKey("partidos.id_partido"), nullable=True)
+
+    jugador: Mapped[Optional["Player"]] = relationship()
+    equipo: Mapped[Optional["Team"]] = relationship()
+    partido: Mapped[Optional["Match"]] = relationship()
+
+class NBAPlayerStatsClean(Base):
+    __tablename__ = 'nba_player_stats_clean'
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    player_name: Mapped[Optional[str]] = mapped_column(String(100))
+    team_name: Mapped[Optional[str]] = mapped_column(String(100))
+    
+    jugador_fk: Mapped[Optional[int]] = mapped_column(ForeignKey("jugadores.id_jugador"), nullable=True)
+    equipo_fk: Mapped[Optional[int]] = mapped_column(ForeignKey("equipos.id_equipo"), nullable=True)
+
+    jugador: Mapped[Optional["Player"]] = relationship()
+    equipo: Mapped[Optional["Team"]] = relationship()
+
+class MLMatchFeatures(Base):
+    __tablename__ = 'ml_match_features'
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    home_team: Mapped[Optional[str]] = mapped_column(String(100))
+    away_team: Mapped[Optional[str]] = mapped_column(String(100))
+    
+    equipo_fk: Mapped[Optional[int]] = mapped_column(ForeignKey("equipos.id_equipo"), nullable=True)
+    partido_fk: Mapped[Optional[int]] = mapped_column(ForeignKey("partidos.id_partido"), nullable=True)
+
+    equipo: Mapped[Optional["Team"]] = relationship()
+    partido: Mapped[Optional["Match"]] = relationship()
+
+class MatchHistoryStats(Base):
+    __tablename__ = 'match_history_stats'
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    home_team: Mapped[Optional[str]] = mapped_column(String(100))
+    away_team: Mapped[Optional[str]] = mapped_column(String(100))
+    
+    local_fk: Mapped[Optional[int]] = mapped_column(ForeignKey("equipos.id_equipo"), nullable=True)
+    visitante_fk: Mapped[Optional[int]] = mapped_column(ForeignKey("equipos.id_equipo"), nullable=True)
+    partido_fk: Mapped[Optional[int]] = mapped_column(ForeignKey("partidos.id_partido"), nullable=True)
+
+    local: Mapped[Optional["Team"]] = relationship(foreign_keys=[local_fk])
+    visitante: Mapped[Optional["Team"]] = relationship(foreign_keys=[visitante_fk])
+    partido: Mapped[Optional["Match"]] = relationship()
+
+# ==========================================
+# MODELOS DE MACHINE LEARNING PIPELINE
+# ==========================================
+
+class RawPlayerData(Base):
+    """
+    Tabla para almacenar datos extraídos 'crudos' (sin procesar/normalizar).
+    Ideal para re-entrenar escaladores o revisar errores de scraping.
+    """
+    __tablename__ = 'ml_raw_player_data'
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    player_name: Mapped[str] = mapped_column(String(100))
+    team_name: Mapped[str] = mapped_column(String(100))
+    
+    # Métricas Crudas
+    playing_time_min: Mapped[Optional[float]] = mapped_column(Numeric(10, 2))
+    total_shots: Mapped[Optional[float]] = mapped_column(Numeric(10, 2))
+    standard_sot: Mapped[Optional[float]] = mapped_column(Numeric(10, 2))
+    
+    # Target
+    performance_gls: Mapped[Optional[float]] = mapped_column(Numeric(10, 2))
+
+    # Control de tiempos
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class InferenceReadyPlayerData(Base):
+    """
+    Tabla para almacenar tensores/vectores pre-procesados, normalizados y validados,
+    listos para ser inyectados directamente en PyTorch.
+    """
+    __tablename__ = 'ml_inference_ready_player_data'
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    player_name: Mapped[str] = mapped_column(String(100))
+    team_name: Mapped[str] = mapped_column(String(100))
+    photo_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    logo_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    
+    # Métricas Normalizadas (RobustScaler)
+    playing_time_min_scaled: Mapped[Optional[float]] = mapped_column(Numeric(10, 5))
+    total_shots_scaled: Mapped[Optional[float]] = mapped_column(Numeric(10, 5))
+    standard_sot_scaled: Mapped[Optional[float]] = mapped_column(Numeric(10, 5))
+    
+    # Target (si existe, para backtesting)
+    performance_gls: Mapped[Optional[float]] = mapped_column(Numeric(10, 2))
+    
+    # Referencia al origen de datos
+    raw_data_id: Mapped[Optional[int]] = mapped_column(ForeignKey("ml_raw_player_data.id"), nullable=True)
+    
+    # Control de tiempos
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 # ==========================================
 # PRUEBA Y CREACIÓN DE ESQUEMAS DDL
 # ==========================================
 if __name__ == '__main__':
-    # Creamos un motor temporal en memoria (SQLite) solo para validar que el DDL está perfecto.
-    # En producción simplemente cambias este string por tu cadena de PostgreSQL:
-    engine = create_engine("postgresql+psycopg2://postgres:Jk9oe@localhost:5432/itscoming_db")
-    
+    import os
+    import sys
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+    from database import engine
 
-    
-    # Emite los comandos CREATE TABLE correspondientes en la consola
     print("--- INICIANDO CONSTRUCCIÓN DE MODELOS EN EL MOTOR ORM ---")
     Base.metadata.create_all(bind=engine)
     print("--- ESQUEMAS CONSTRUIDOS CORRECTAMENTE ---")

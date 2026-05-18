@@ -25,7 +25,7 @@ logger = logging.getLogger("ETL_Orchestrator")
 
 # Cadena de conexión para PostgreSQL (Apunta a tu clúster de PyTorch DB)
 # En producción, esto debe venir de variables de entorno (.env)
-DB_URL = "postgresql+psycopg2}://postgres:Jk9oe@localhost:5432/itscoming_db"
+DB_URL = os.getenv("DB_URL", "postgresql+psycopg2://postgres:Jk9oe@localhost:5432/itscoming_db")
 
 def _clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     """Manejo de Pandas: Limpia nulos y estandariza tipos de datos para la ingesta SQL."""

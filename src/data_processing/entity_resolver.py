@@ -3,7 +3,7 @@ from datetime import timedelta, datetime
 import pandas as pd
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func, and_, or_, cast, Date
-from thefuzz import process
+from rapidfuzz import process
 
 # Modelos internos ORM
 from src.data.models import Team, Player, Match
@@ -41,7 +41,7 @@ class EntityResolver:
             self._team_cache[name] = exact_team.id_equipo
             return exact_team.id_equipo
             
-        # Búsqueda difusa (thefuzz) en caso de fallos exactos
+        # Búsqueda difusa (rapidfuzz) en caso de fallos exactos
         logger.debug(f"Iniciando coincidencia difusa para el equipo: '{name}'")
         all_teams = self.session.execute(select(Team)).scalars().all()
         
