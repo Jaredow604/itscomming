@@ -36,3 +36,6 @@ tests/_test_scalers/
 checkpoints/
 model_weights/
 oracle*.pth
+
+# Media files (logos now in logos/ directory for CDN)
+media/logos/
