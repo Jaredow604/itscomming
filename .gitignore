@@ -25,3 +25,14 @@ downloaded_files/
 .vscode/
 *.swp
 *.swo
+
+# Testing
+.pytest_cache/
+tests/_test_scalers/
+#
+# Model weights and large artifacts
+*.pth
+*.pt
+checkpoints/
+model_weights/
+oracle*.pth
