@@ -215,9 +215,6 @@ function NBAMetrics({ prediction }: { prediction: NBAPrediction }) {
 }
 
 function SoccerMetrics({ prediction }: { prediction: SoccerPrediction }) {
-  const favoredLabel =
-    prediction.favored === 'home' ? 'Local' :
-    prediction.favored === 'away' ? 'Visitante' : 'Empate';
 
   return (
     <div className="grid grid-cols-3 gap-2">

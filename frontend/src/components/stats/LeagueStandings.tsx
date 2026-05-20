@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Loader2, Trophy, ArrowUp, ArrowDown, Minus, AlertCircle } from 'lucide-react';
+import { Loader2, Trophy, AlertCircle } from 'lucide-react';
 import TeamLogo from '../ui/TeamLogo';
 import { useStandings } from '../../hooks/useStandings';
 import type { LeagueStanding } from '../../types';
@@ -33,21 +33,7 @@ function PositionBadge({ pos }: { pos: number }) {
   );
 }
 
-function FormIndicator({ standing, allStandings }: { standing: LeagueStanding; allStandings: LeagueStanding[] }) {
-  const idx = allStandings.findIndex(s => s.team_id === standing.team_id);
-  const prevIdx = allStandings.findIndex(s => s.team_id === standing.team_id);
-
-  if (standing.played === 0) {
-    return <Minus className="w-3 h-3 text-slate-400" />;
-  }
-
-  const winRate = standing.wins / standing.played;
-  if (winRate >= 0.6) return <ArrowUp className="w-3 h-3 text-emerald-500" />;
-  if (winRate <= 0.3) return <ArrowDown className="w-3 h-3 text-red-500" />;
-  return <Minus className="w-3 h-3 text-slate-400" />;
-}
-
-export default function LeagueStandings({ isDark }: LeagueStandingsProps) {
+export default function LeagueStandings({ isDark: _isDark }: LeagueStandingsProps) {
   const [activeLeague, setActiveLeague] = useState('premier');
   const [activeSeason, setActiveSeason] = useState('25-26');
   const { data, isLoading, error } = useStandings(activeLeague, activeSeason);
