@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Search, Target, X, Plus, Filter } from 'lucide-react';
+import { Search, Target, X, Plus } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 import type { TeamStatsEntry } from '../../types';
 import TeamLogo from '../ui/TeamLogo';
@@ -57,6 +57,17 @@ export default function TeamSidebar({
     teams.forEach(t => leagues.add(getLeagueForTeam(t.name)));
     return ['Todas', ...Array.from(leagues).sort()];
   }, [teams]);
+
+  const uniqueTeams = useMemo(() => {
+    const seen = new Map<string, TeamStatsEntry>();
+    filteredTeams.forEach(t => {
+      const existing = seen.get(t.name);
+      if (!existing || (t.logo_url && !existing.logo_url)) {
+        seen.set(t.name, t);
+      }
+    });
+    return Array.from(seen.values());
+  }, [filteredTeams]);
 
   return (
     <div className="flex flex-col h-full">
@@ -129,13 +140,13 @@ export default function TeamSidebar({
           </div>
         )}
 
-        {!isLoading && filteredTeams.length === 0 && (
+        {!isLoading && uniqueTeams.length === 0 && (
           <div className="text-center py-8">
             <p className="text-xs text-slate-400">Sin equipos</p>
           </div>
         )}
 
-        {filteredTeams.map((team) => {
+        {uniqueTeams.map((team) => {
           const isSelected = selectedTeam === team.name;
           const isCompared = compareTeam === team.name;
 
@@ -152,7 +163,7 @@ export default function TeamSidebar({
                            : 'hover:bg-slate-100/80 dark:hover:bg-white/5 border-l-2 border-transparent'
                          }`}
             >
-              <TeamLogo name={team.name} size="md" className="flex-shrink-0" />
+              <TeamLogo url={team.logo_url} name={team.name} size="sm" className="flex-shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className={`text-xs font-medium truncate
                   ${isSelected ? 'text-brand-600 dark:text-brand-400' : 'text-slate-700 dark:text-slate-200'}`}>

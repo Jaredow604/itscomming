@@ -24,7 +24,7 @@ export default function TeamComparison({ comparison, onClose, onChat }: TeamComp
   ];
 
   return (
-    <div className="max-w-3xl mx-auto p-6 space-y-6">
+    <div className="w-full px-6 py-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-bold text-slate-800 dark:text-white">
@@ -38,39 +38,68 @@ export default function TeamComparison({ comparison, onClose, onChat }: TeamComp
         </button>
       </div>
 
-      {/* Teams header */}
-      <div className="glass-card p-4">
-        {/* Matchup Header */}
-        <div className="flex items-center justify-between mb-8 relative">
-          <div className="flex-1 text-center flex flex-col items-center">
-            <TeamLogo name={team1.name} size="xl" className="mb-3 ring-4 ring-brand-500/20" />
-            <h3 className="text-xl font-bold text-slate-800 dark:text-white">
-              {team1.name}
-            </h3>
-            <span className="text-sm text-slate-500 dark:text-slate-400 mt-1">Local</span>
-          </div>
-          
-          <div className="px-4 text-center z-10">
-            <div className="bg-slate-100 dark:bg-slate-800 rounded-full p-3 border border-slate-200 dark:border-slate-700 shadow-sm">
-              <span className="text-sm font-black text-slate-400 dark:text-slate-500">VS</span>
+      {/* Teams header + Metrics side by side on wide screens */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Teams header */}
+        <div className="glass-card p-4">
+          {/* Matchup Header */}
+          <div className="flex items-center justify-between mb-8 relative">
+            <div className="flex-1 text-center flex flex-col items-center">
+              <TeamLogo url={team1.logo_url} name={team1.name} size="xl" className="mb-3 ring-4 ring-brand-500/20" />
+              <h3 className="text-xl font-bold text-slate-800 dark:text-white">
+                {team1.name}
+              </h3>
+              <span className="text-sm text-slate-500 dark:text-slate-400 mt-1">Local</span>
             </div>
+            
+            <div className="px-4 text-center z-10">
+              <div className="bg-slate-100 dark:bg-slate-800 rounded-full p-3 border border-slate-200 dark:border-slate-700 shadow-sm">
+                <span className="text-sm font-black text-slate-400 dark:text-slate-500">VS</span>
+              </div>
+            </div>
+            
+            <div className="flex-1 text-center flex flex-col items-center">
+              <TeamLogo url={team2.logo_url} name={team2.name} size="xl" className="mb-3 ring-4 ring-slate-500/20" />
+              <h3 className="text-xl font-bold text-slate-800 dark:text-white">
+                {team2.name}
+              </h3>
+              <span className="text-sm text-slate-500 dark:text-slate-400 mt-1">Visitante</span>
+            </div>
+            
+            {/* Decorative line */}
+            <div className="absolute left-1/4 right-1/4 top-[40px] h-px bg-gradient-to-r from-transparent via-slate-200 dark:via-slate-700 to-transparent -z-10" />
           </div>
-          
-          <div className="flex-1 text-center flex flex-col items-center">
-            <TeamLogo name={team2.name} size="xl" className="mb-3 ring-4 ring-slate-500/20" />
-            <h3 className="text-xl font-bold text-slate-800 dark:text-white">
-              {team2.name}
-            </h3>
-            <span className="text-sm text-slate-500 dark:text-slate-400 mt-1">Visitante</span>
-          </div>
-          
-          {/* Decorative line */}
-          <div className="absolute left-1/4 right-1/4 top-[40px] h-px bg-gradient-to-r from-transparent via-slate-200 dark:via-slate-700 to-transparent -z-10" />
+        </div>
+
+        {/* Radar chart */}
+        <div className="glass-card p-4">
+          <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">
+            Radar Comparativo
+          </h3>
+          <ResponsiveContainer width="100%" height={250}>
+            <RadarChart data={normalizedRadarData}>
+              <PolarGrid stroke="rgba(148,163,184,0.2)" />
+              <PolarAngleAxis dataKey="metric" tick={{ fontSize: 10, fill: '#94a3b8' }} />
+              <PolarRadiusAxis tick={false} axisLine={false} />
+              <Radar name={team1.name} dataKey="t1" stroke="#10b981" fill="#10b981" fillOpacity={0.2} strokeWidth={2} />
+              <Radar name={team2.name} dataKey="t2" stroke="#f43f5e" fill="#f43f5e" fillOpacity={0.2} strokeWidth={2} />
+              <Legend wrapperStyle={{ fontSize: '10px' }} />
+              <Tooltip
+                contentStyle={{
+                  background: '#1e293b',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: '8px',
+                  fontSize: '11px',
+                }}
+                formatter={(value) => `${Number(value).toFixed(0)}%`}
+              />
+            </RadarChart>
+          </ResponsiveContainer>
         </div>
       </div>
 
       {/* Side-by-side metrics */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
         <TeamMetricCard team={team1.name} label="Goles/Juego" value={team1.prom_goles.toFixed(2)} isLeft />
         <TeamMetricCard team={team2.name} label="Goles/Juego" value={team2.prom_goles.toFixed(2)} />
         <TeamMetricCard team={team1.name} label="Tiros a Puerta" value={team1.prom_tiros_puerta.toFixed(1)} isLeft />
@@ -85,42 +114,16 @@ export default function TeamComparison({ comparison, onClose, onChat }: TeamComp
           <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">
             Ventajas por métrica
           </h3>
-          <div className="space-y-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             {comparison.advantages.map((adv: string, i: number) => (
               <div key={i} className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-brand-500" />
+                <div className="w-2 h-2 rounded-full bg-brand-500 flex-shrink-0" />
                 <span className="text-xs text-slate-600 dark:text-slate-300">{adv}</span>
               </div>
             ))}
           </div>
         </div>
       )}
-
-      {/* Radar chart */}
-      <div className="glass-card p-4">
-        <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">
-          Radar Comparativo
-        </h3>
-        <ResponsiveContainer width="100%" height={250}>
-          <RadarChart data={normalizedRadarData}>
-            <PolarGrid stroke="rgba(148,163,184,0.2)" />
-            <PolarAngleAxis dataKey="metric" tick={{ fontSize: 10, fill: '#94a3b8' }} />
-            <PolarRadiusAxis tick={false} axisLine={false} />
-            <Radar name={team1.name} dataKey="t1" stroke="#10b981" fill="#10b981" fillOpacity={0.2} strokeWidth={2} />
-            <Radar name={team2.name} dataKey="t2" stroke="#f43f5e" fill="#f43f5e" fillOpacity={0.2} strokeWidth={2} />
-            <Legend wrapperStyle={{ fontSize: '10px' }} />
-            <Tooltip
-              contentStyle={{
-                background: '#1e293b',
-                border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: '8px',
-                fontSize: '11px',
-              }}
-              formatter={(value) => `${Number(value).toFixed(0)}%`}
-            />
-          </RadarChart>
-        </ResponsiveContainer>
-      </div>
 
       {/* CTA */}
       <button

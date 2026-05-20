@@ -11,6 +11,7 @@ Endpoints:
 
 import logging
 from datetime import date, timedelta
+from django.db import models
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -25,74 +26,68 @@ logger = logging.getLogger(__name__)
 # ============================================================
 # UTILIDADES
 # ============================================================
+
+_logo_cache = {}
+
+def _get_logo_url(team_name: str) -> str:
+    """Resuelve el logo_url de un equipo por nombre, con cache."""
+    if team_name in _logo_cache:
+        return _logo_cache[team_name]
+    try:
+        eq = Equipos.objects.filter(nombre__iexact=team_name).first()
+        if eq and eq.logo_url:
+            _logo_cache[team_name] = eq.logo_url
+            return eq.logo_url
+        eq = Equipos.objects.filter(nombre__icontains=team_name).first()
+        if eq and eq.logo_url:
+            _logo_cache[team_name] = eq.logo_url
+            return eq.logo_url
+    except Exception:
+        pass
+    _logo_cache[team_name] = ''
+    return ''
+
+
 class PlayerPropsAPIView(APIView):
     """
-    GET /api/v1/player_props/
-    Retorna el Top de Player Props ordenados por EV (Z-Score ofensivo).
+    GET /api/v1/player_props/?sport=soccer|nba|mlb|all&min_ev=0
+    Retorna player props con análisis completo de tendencias, patrones y EV.
     """
     def get(self, request):
-        from database import SessionLocal
-        from src.data.models import InferenceReadyPlayerData
-        import torch
-        
-        session = SessionLocal()
+        sport = request.query_params.get('sport', 'all')
+        min_ev = float(request.query_params.get('min_ev', '0'))
+
         try:
-            players = session.query(InferenceReadyPlayerData).all()
-            
-            # Instanciar el modelo de Player Props
-            from predicciones.views import MODELO_VALUE
-            if not MODELO_VALUE:
-                return Response({'error': 'PlayerPropNet no está en línea.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-            
-            results = []
-            
-            for p in players:
-                # Validar la existencia de los campos
-                pt_min = float(p.playing_time_min_scaled or 0.0)
-                t_shots = float(p.total_shots_scaled or 0.0)
-                s_sot = float(p.standard_sot_scaled or 0.0)
-                
-                feat = torch.tensor([[pt_min, t_shots, s_sot]], dtype=torch.float32)
-                
-                with torch.no_grad():
-                    pred = MODELO_VALUE(feat).item()
-                    
-                # Proxy de EV: Multiplicador heurístico (en producción esto cruzaría con momios)
-                ev_score = round(pred * 1.5 + (t_shots * 0.5), 2)
-                
-                # Excluir outliers groseros del dashboard
-                if ev_score < -100 or ev_score > 100:
-                    continue
-                    
-                prop_type = "+0.5 Goles/Asistencias" if ev_score > 1.5 else "+1.5 Tiros"
-                
-                # Para MVP visual, forzamos que Mbappé/Haaland salgan top si están (z-score testing)
-                if p.photo_url:
-                    ev_score += 10.0 # Boost manual para que los datos con foto salgan en el Top del UI
-                
-                results.append({
-                    "id": p.id,
-                    "player_name": p.player_name,
-                    "team_name": p.team_name,
-                    "prop_type": prop_type,
-                    "ev_score": round(ev_score, 2),
-                    "prediction_value": f"{min(max(int(pred * 10), 10), 99)}%",
-                    "photo_url": p.photo_url or "",
-                    "logo_url": p.logo_url or ""
-                })
-                
-            # Sort by EV descending and take top 10
-            top_props = sorted(results, key=lambda x: x['ev_score'], reverse=True)[:10]
-            
-            return Response(top_props, status=status.HTTP_200_OK)
-            
+            from predicciones.player_prop_engine import generate_props_for_sport
+
+            if sport == 'all':
+                all_props = []
+                for s in ['nba', 'mlb', 'soccer']:
+                    props = generate_props_for_sport(s, min_ev=min_ev)
+                    all_props.extend(props)
+                all_props.sort(key=lambda p: p['primary_ev'], reverse=True)
+                results = all_props
+            else:
+                results = generate_props_for_sport(sport, min_ev=min_ev)
+
+            total = len(results)
+            avg_ev = round(sum(p['primary_ev'] for p in results) / total, 2) if total > 0 else 0
+            high_conf = sum(1 for p in results if p['primary_confidence'] == 'high')
+
+            return Response({
+                'props': results,
+                'summary': {
+                    'total': total,
+                    'avg_ev': avg_ev,
+                    'high_confidence_count': high_conf,
+                },
+            }, status=status.HTTP_200_OK)
+
         except Exception as e:
             import traceback
             tb = traceback.format_exc()
             logger.error(f"Error en PlayerPropsAPIView: {e}")
             return Response({'error': str(e), 'trace': tb}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        finally:
-            session.close()
 def _calculate_confidence(sport: str, prediction: dict) -> float:
     """Calcula nivel de confianza (edge) 50-95 para un pick deportivo."""
     try:
@@ -246,6 +241,8 @@ class TodayGamesAPIView(APIView):
                     'sport': match.sport,
                     'home_team': match.home_team,
                     'away_team': match.away_team,
+                    'home_logo_url': _get_logo_url(match.home_team),
+                    'away_logo_url': _get_logo_url(match.away_team),
                     'start_time': match.start_time.strftime('%H:%M') if match.start_time else '--:--',
                     'prediction': prediction,
                     'confidence_pct': confidence,
@@ -296,6 +293,8 @@ class BestPicksAPIView(APIView):
                     'sport': match.sport,
                     'home_team': match.home_team,
                     'away_team': match.away_team,
+                    'home_logo_url': _get_logo_url(match.home_team),
+                    'away_logo_url': _get_logo_url(match.away_team),
                     'start_time': match.start_time.strftime('%H:%M') if match.start_time else '--:--',
                     'pick_type': pick_type,
                     'pick_value': pick_value,
@@ -333,6 +332,8 @@ class BestPicksAPIView(APIView):
                         'sport': match.sport,
                         'home_team': match.home_team,
                         'away_team': match.away_team,
+                        'home_logo_url': _get_logo_url(match.home_team),
+                        'away_logo_url': _get_logo_url(match.away_team),
                         'date': hist_date.isoformat(),
                         'pick_type': pick_type,
                         'pick_value': pick_value,
@@ -348,30 +349,35 @@ class BestPicksAPIView(APIView):
             history = [
                 {
                     'sport': 'soccer', 'home_team': 'Arsenal', 'away_team': 'Chelsea',
+                    'home_logo_url': _get_logo_url('Arsenal'), 'away_logo_url': _get_logo_url('Chelsea'),
                     'date': yesterday.isoformat(), 'pick_type': 'moneyline',
                     'pick_value': 'Arsenal ML', 'confidence_pct': 72,
                     'result': 'win', 'actual_score': '2-1',
                 },
                 {
                     'sport': 'nba', 'home_team': 'Lakers', 'away_team': 'Celtics',
+                    'home_logo_url': _get_logo_url('Lakers'), 'away_logo_url': _get_logo_url('Celtics'),
                     'date': yesterday.isoformat(), 'pick_type': 'total',
                     'pick_value': 'O 228.5', 'confidence_pct': 82,
                     'result': 'loss', 'actual_score': '108-107 (215)',
                 },
                 {
                     'sport': 'soccer', 'home_team': 'Real Madrid', 'away_team': 'Barcelona',
+                    'home_logo_url': _get_logo_url('Real Madrid'), 'away_logo_url': _get_logo_url('Barcelona'),
                     'date': two_days_ago.isoformat(), 'pick_type': 'moneyline',
                     'pick_value': 'Real Madrid ML', 'confidence_pct': 65,
                     'result': 'win', 'actual_score': '3-1',
                 },
                 {
                     'sport': 'mlb', 'home_team': 'Yankees', 'away_team': 'Red Sox',
+                    'home_logo_url': _get_logo_url('Yankees'), 'away_logo_url': _get_logo_url('Red Sox'),
                     'date': two_days_ago.isoformat(), 'pick_type': 'spread',
                     'pick_value': 'Yankees -1.5', 'confidence_pct': 78,
                     'result': 'win', 'actual_score': '5-2',
                 },
                 {
                     'sport': 'soccer', 'home_team': 'Bayern Munich', 'away_team': 'Dortmund',
+                    'home_logo_url': _get_logo_url('Bayern Munich'), 'away_logo_url': _get_logo_url('Dortmund'),
                     'date': (today - timedelta(days=3)).isoformat(), 'pick_type': 'moneyline',
                     'pick_value': 'Bayern Munich ML', 'confidence_pct': 85,
                     'result': 'win', 'actual_score': '4-1',
@@ -412,7 +418,8 @@ class TeamStatsAPIView(APIView):
             today = date.today()
 
             # --- Lista de equipos ---
-            qs = Equipos.objects.all()
+            # Filtrar equipos con stats reales (prom_goles > 0)
+            qs = Equipos.objects.filter(prom_goles__gt=0)
 
             if sport:
                 # Mapear sport a nombre de liga
@@ -422,7 +429,7 @@ class TeamStatsAPIView(APIView):
                     'soccer': ['premier', 'liga', 'serie', 'bundes', 'ligue', 'eredivisie', 'championship', 'brasile', 'copa'],
                 }
                 # No hay campo league en Equipos, filtramos por stats
-                # Para soccer: equipos con prom_goles > 0
+                # Para soccer: equipos con prom_goles > 0 (ya filtrado arriba)
                 # Para NBA/MLB: usamos los names conocidos
 
             # Aplicar match_today filter si aplica
@@ -438,9 +445,10 @@ class TeamStatsAPIView(APIView):
             for eq in qs:
                 teams.append({
                     'name': eq.nombre,
-                    'prom_goles': float(eq.prom_goles or 0),
-                    'prom_tiros_puerta': float(eq.prom_tiros_puerta or 0),
-                    'prom_corners': float(eq.prom_corners or 0),
+                    'logo_url': eq.logo_url or '',
+                    'prom_goles': float(eq.prom_goles) if eq.prom_goles else 0.0,
+                    'prom_tiros_puerta': float(eq.prom_tiros_puerta) if eq.prom_tiros_puerta else 0.0,
+                    'prom_corners': float(eq.prom_corners) if eq.prom_corners else 0.0,
                 })
 
             # Ordenar por prom_goles descendente
@@ -475,6 +483,7 @@ class TeamStatsAPIView(APIView):
 
                     response_data['detail'] = {
                         'name': eq.nombre,
+                        'logo_url': eq.logo_url or '',
                         'prom_goles': float(eq.prom_goles or 0),
                         'prom_tiros_puerta': float(eq.prom_tiros_puerta or 0),
                         'prom_corners': float(eq.prom_corners or 0),
@@ -491,6 +500,7 @@ class TeamStatsAPIView(APIView):
                         if eq:
                             comparisons.append({
                                 'name': eq.nombre,
+                                'logo_url': eq.logo_url or '',
                                 'prom_goles': float(eq.prom_goles or 0),
                                 'prom_tiros_puerta': float(eq.prom_tiros_puerta or 0),
                                 'prom_corners': float(eq.prom_corners or 0),
@@ -562,6 +572,8 @@ class DailyPredictionsAPIView(APIView):
                     'sport': match.sport,
                     'home_team': match.home_team,
                     'away_team': match.away_team,
+                    'home_logo_url': _get_logo_url(match.home_team),
+                    'away_logo_url': _get_logo_url(match.away_team),
                     'start_time': match.start_time.strftime('%H:%M') if match.start_time else '--:--',
                     'prediction': prediction,
                     'confidence_pct': confidence,
@@ -605,5 +617,196 @@ class ModelHealthAPIView(APIView):
             logger.error("Error en ModelHealthAPIView: %s", e)
             return Response(
                 {'status': 'error', 'detail': str(e)},
+                status=status.HTTP_200_OK,
+            )
+
+
+# ============================================================
+# TABLA DE CLASIFICACION
+# ============================================================
+
+_LEAGUE_KEYWORDS = {
+    'premier': ['premier league', 'epl', 'premier'],
+    'laliga': ['la liga', 'laliga', 'liga espanola', 'primera division'],
+    'seriea': ['serie a', 'seriea', 'calcio'],
+    'bundesliga': ['bundesliga', 'bundes'],
+    'ligue1': ['ligue 1', 'ligue1', 'ligue'],
+    'ligamx': ['liga mx', 'ligamx'],
+    'nba': ['nba'],
+    'mlb': ['mlb'],
+}
+
+
+def _resolve_league(league_param: str) -> list[str]:
+    """Resuelve un parametro de liga a una lista de keywords para buscar en DB."""
+    key = league_param.lower().replace(' ', '')
+    if key in _LEAGUE_KEYWORDS:
+        return _LEAGUE_KEYWORDS[key]
+    return [key]
+
+
+class StandingsAPIView(APIView):
+    """
+    GET /api/v1/standings/?league=premier|laliga|seriea|bundesliga|ligue1|nba|mlb
+
+    Calcula la tabla de clasificacion a partir de match_history_stats (SQLAlchemy).
+    Para futbol: PTS, PJ, PG, PE, PP, GF, GC, DG
+    Para NBA/MLB: W, L, PCT
+    """
+
+    def get(self, request):
+        league = request.query_params.get('league', 'premier')
+        season = request.query_params.get('season', None)
+        keywords = _resolve_league(league)
+
+        try:
+            from database import SessionLocal
+            from src.data.models import MatchHistoryStats, Team
+            from sqlalchemy import or_
+
+            logger.info("StandingsAPIView: league=%s, season=%s, keywords=%s", league, season, keywords)
+
+            is_basketball = league.lower() in ('nba',)
+            is_baseball = league.lower() in ('mlb',)
+
+            session = SessionLocal()
+            try:
+                # Filtrar partidos por liga usando ilike
+                q_objects = [MatchHistoryStats.league.ilike(f'%{kw}%') for kw in keywords]
+                query = session.query(MatchHistoryStats).filter(
+                    or_(*q_objects),
+                    MatchHistoryStats.home_score.isnot(None),
+                    MatchHistoryStats.away_score.isnot(None),
+                )
+
+                # Filtrar por season si se proporciona
+                if season:
+                    query = query.filter(MatchHistoryStats.season == season)
+
+                matches = query.order_by(MatchHistoryStats.date).all()
+
+                logger.info("StandingsAPIView: found %d matches for league %s", len(matches), league)
+
+                if not matches:
+                    return Response({
+                        'standings': [],
+                        'league': league,
+                        'season': season,
+                        'available_seasons': ['25-26', '24-25', '23-24'],
+                    }, status=status.HTTP_200_OK)
+
+                # Recopilar todos los team_ids involucrados
+                team_ids = set()
+                for m in matches:
+                    if m.local_fk:
+                        team_ids.add(m.local_fk)
+                    if m.visitante_fk:
+                        team_ids.add(m.visitante_fk)
+
+                if not team_ids:
+                    return Response({
+                        'standings': [],
+                        'league': league,
+                        'season': season,
+                        'available_seasons': ['25-26', '24-25', '23-24'],
+                    }, status=status.HTTP_200_OK)
+
+                # Obtener info de equipos (nombres y logos)
+                teams_info = {}
+                for tid in team_ids:
+                    team = session.query(Team).filter(Team.id_equipo == tid).first()
+                    if team:
+                        teams_info[tid] = {
+                            'name': team.nombre,
+                            'logo_url': team.logo_url or '',
+                        }
+
+                # Inicializar standings
+                standings = {}
+                for tid in team_ids:
+                    info = teams_info.get(tid, {'name': '', 'logo_url': ''})
+                    standings[tid] = {
+                        'team_id': tid,
+                        'team_name': info['name'],
+                        'logo_url': info['logo_url'],
+                        'played': 0,
+                        'wins': 0,
+                        'draws': 0,
+                        'losses': 0,
+                        'goals_for': 0,
+                        'goals_against': 0,
+                        'goal_diff': 0,
+                        'points': 0,
+                    }
+
+                # Calcular stats de cada partido
+                for m in matches:
+                    home_id = m.local_fk
+                    away_id = m.visitante_fk
+                    hg = m.home_score
+                    ag = m.away_score
+
+                    if not home_id or not away_id:
+                        continue
+
+                    home = standings.get(home_id)
+                    away = standings.get(away_id)
+                    if not home or not away:
+                        continue
+
+                    home['played'] += 1
+                    away['played'] += 1
+                    home['goals_for'] += hg
+                    home['goals_against'] += ag
+                    away['goals_for'] += ag
+                    away['goals_against'] += hg
+
+                    if hg > ag:
+                        home['wins'] += 1
+                        away['losses'] += 1
+                        if is_basketball or is_baseball:
+                            home['points'] += 1
+                        else:
+                            home['points'] += 3
+                    elif hg < ag:
+                        away['wins'] += 1
+                        home['losses'] += 1
+                        if is_basketball or is_baseball:
+                            away['points'] += 1
+                        else:
+                            away['points'] += 3
+                    else:
+                        home['draws'] += 1
+                        away['draws'] += 1
+                        if not is_basketball and not is_baseball:
+                            home['points'] += 1
+                            away['points'] += 1
+
+                # Calcular goal_diff
+                for s in standings.values():
+                    s['goal_diff'] = s['goals_for'] - s['goals_against']
+
+                # Ordenar: puntos > goal_diff > goles a favor
+                result = sorted(
+                    standings.values(),
+                    key=lambda x: (-x['points'], -x['goal_diff'], -x['goals_for'])
+                )
+
+                return Response({
+                    'standings': result,
+                    'league': league,
+                    'season': season,
+                    'available_seasons': ['25-26', '24-25', '23-24'],
+                }, status=status.HTTP_200_OK)
+
+            finally:
+                session.close()
+
+        except Exception as e:
+            logger.error("Error en StandingsAPIView: %s", e)
+            import traceback
+            logger.error(traceback.format_exc())
+            return Response(
+                {'standings': [], 'league': league, 'season': season, 'error': f'Error obteniendo tabla: {str(e)}'},
                 status=status.HTTP_200_OK,
             )

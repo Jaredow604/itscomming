@@ -71,12 +71,12 @@ export default function PickCard({ pick, index, isHistorical }: PickCardProps) {
 
         {/* Matchup */}
         <div className="flex items-center gap-1.5 mb-2">
-          <TeamLogo name={pick.home_team} size="sm" />
+          <TeamLogo url={pick.home_logo_url} name={pick.home_team} size="sm" />
           <p className="text-[11px] font-semibold text-slate-700 dark:text-slate-200 truncate">
             {pick.home_team}
           </p>
           <span className="text-[9px] text-slate-400 mx-0.5">vs</span>
-          <TeamLogo name={pick.away_team} size="sm" />
+          <TeamLogo url={pick.away_logo_url} name={pick.away_team} size="sm" />
           <p className="text-[11px] font-semibold text-slate-700 dark:text-slate-200 truncate">
             {pick.away_team}
           </p>

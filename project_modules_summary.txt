@@ -1,0 +1,149 @@
+It's Coming — Resumen de módulos y tecnologías
+
+Descripción breve
+-----------------
+"It's Coming" es una plataforma de análisis predictivo deportivo que combina pipelines de ingestión, normalización de datos, modelos de ML (PyTorch) y una interfaz web para visualizar predicciones y detectar "value" frente a momios.
+
+Tecnologías principales
+----------------------
+- Python 3.11+: núcleo del backend, scripts y entrenamiento de modelos.
+- Django >=4: framework web principal (API, administración, templates).
+- Django REST Framework: exposición de endpoints API.
+- Celery + Redis: ejecución de tareas asíncronas y scheduler (Beat).
+- PostgreSQL (psycopg2): base de datos relacional para persistencia.
+- SQLAlchemy: capa de acceso para pipelines y scripts fuera del ORM de Django.
+- PyTorch: modelos de ML y pesos (.pth) en `checkpoints/`.
+- scikit-learn / joblib: escalado y utilidades de ML (scalers, validación).
+- Pandas / NumPy: procesamiento y normalización de datos.
+- Docker / docker-compose: contenedorización (web, db, redis, workers).
+- Gunicorn: servidor WSGI en producción dentro del contenedor.
+- FastAPI / Uvicorn: presente en dependencias para microservicios/ad-hoc.
+- Node / Vite / React / TypeScript / Tailwind: interfaz frontend moderna (dashboard).
+- Apify: integración para scraping (Transfermarkt actor) usada por `tasks_apify.py`.
+- LangChain / Google GenAI: integración de IA conversacional/analítica (Oracle en README).
+
+Módulos / Carpetas (qué, para qué y por qué)
+--------------------------------------------
+- `manage.py`:
+  Qué: CLI de Django.
+  Para qué: ejecutar migraciones, runserver, comandos custom.
+  Por qué: punto de entrada estándar para administrar la app Django.
+
+- `core/`:
+  Qué: proyecto Django (`settings.py`, `urls.py`, `wsgi.py`, `asgi.py`, `celery.py`).
+  Para qué: configuración central del servidor, integración Celery, CORS, logging y schedule.
+  Por qué: agrupa la configuración y el bootstrapping de la aplicación.
+
+- `predicciones/` (Django app principal):
+  Qué: lógica de negocio para ingestión, resolución de entidades, modelos, tareas y APIs.
+  Para qué: manejar datos deportivos, persistencia y endpoints que exponen predicciones.
+  Por qué: centraliza la funcionalidad de predicción y orquesta pipelines.
+
+  Subcomponentes clave:
+  - `models.py`:
+    Qué: modelos Django del dominio (Equipos, Partido, DailySchedule, AliasEquipo, EntidadHuerfana).
+    Para qué: persistir fixtures, equipos, alias y schedules en PostgreSQL vía ORM.
+    Por qué: modelo canónico del dominio necesario para entity resolution y auditoría.
+
+  - `tasks.py`:
+    Qué: tareas Celery programadas y resumidas (ej. `fetch_and_process_daily_data`).
+    Para qué: ETL diario: extracción, validación, normalización y persistencia para inferencia.
+    Por qué: separa trabajo pesado y cronometrado del request/response web.
+
+  - `tasks_apify.py`:
+    Qué: tareas asíncronas para integrar Apify (scrapers externos, imágenes, logos).
+    Para qué: enriquecer registros con fotos/logos y mantener la calidad de la UI.
+    Por qué: outsourcing de scraping para fiabilidad y escalabilidad.
+
+  - `entity_resolver.py`:
+    Qué: funciones de limpieza y "fuzzy matching" (RapidFuzz) para mapear nombres externos a equipos canónicos.
+    Para qué: resolver inconsistencias de nombres entre fuentes (ej. "Chivas" vs "Guadalajara").
+    Por qué: integridad de datos para evitar duplicados y errores en pipelines.
+
+  - `model_registry.py`:
+    Qué: registry/singleton para cargar y cachear modelos PyTorch en memoria del proceso.
+    Para qué: evitar cargar pesos desde disco por cada petición (latencia alta), asignación a GPU/CPU.
+    Por qué: eficiencia y rendimiento en inferencia (latencias bajas, uso razonable de memoria).
+
+  - `api_views.py` / `views.py`:
+    Qué: vistas y endpoints (DRF) para exponer predicciones, estados y operaciones.
+    Para qué: permitir consumo por frontend o APIs externas.
+    Por qué: separación backend/frontend mediante contratos API.
+
+  - `management/commands/`:
+    Qué: comandos Django custom para ingesta, repoblado y utilidades.
+    Para qué: tareas one-off reproducibles (ej. importar H2H, poblar BD).
+    Por qué: facilitan reproducibilidad y mantenimiento operacional.
+
+- `src/`:
+  Qué: paquete/servicios de pipeline y modelos (data, pipeline, models, training, services).
+  Para qué: contener transformaciones, orquestadores y utilidades reutilizables fuera de la app Django.
+  Por qué: desacoplar lógica de ciencia de datos del web app para pruebas y reuso (usa SQLAlchemy, pandas, scikit-learn).
+
+- `scripts/`:
+  Qué: scripts independientes para ingesta (ingesta_futbol.py, ingesta_mlb.py, ingesta_nba.py).
+  Para qué: bajar datos desde APIs o scrapers, crear tablas y alimentar el pipeline.
+  Por qué: procesos ad-hoc o programados que alimentan el DW y tablas de audit.
+
+- `train_*.py` / `entrenar_modeloAI.py`:
+  Qué: scripts de entrenamiento (PyTorch) por deporte o por tipo de modelo.
+  Para qué: re-entrenar modelos, guardar checkpoints en `checkpoints/`.
+  Por qué: ciclo MLOps básico: entrenar -> versionar pesos -> desplegar en `ModelRegistry`.
+
+- `checkpoints/`:
+  Qué: pesos de modelos (.pth) (nba_best_model_weights.pth, mlb..., etc.).
+  Para qué: fuente de verdad de los pesos usados en inferencia.
+  Por qué: separar artefactos de entrenamiento del código.
+
+- `frontend/`:
+  Qué: aplicación React + Vite + TypeScript (UI, dashboards, pages y assets).
+  Para qué: visualización de predicciones, gráficos (Recharts), interacción de usuario, autenticación y presentaciones.
+  Por qué: UX moderna y desarrollo frontend rápido con HMR (Vite).
+  Tecnologías visibles en `frontend/package.json`: React, Vite, TypeScript, Tailwind, Axios, React Query, Recharts.
+
+- `Dockerfile` / `docker-compose.yml`:
+  Qué: definición de contenedores y orquestación local (web, db:postgres, redis, workers, beat).
+  Para qué: reproducir entorno de despliegue y separar servicios.
+  Por qué: facilita CI/CD, despliegues y consistencia entre entornos.
+
+- `database.py`:
+  Qué: configuración de `SQLAlchemy` y `SessionLocal`, detecta settings de Django si están disponibles.
+  Para qué: permitir acceso a DB desde scripts/pipelines fuera del ciclo de vida de Django.
+  Por qué: independencia entre procesos (workers, scripts) y reuso de conexión.
+
+- `templates/`:
+  Qué: plantillas HTML server-rendered (chat.html, dashboard_futurista.html, index.html, scanner.html).
+  Para qué: páginas base y puntos de integración con frontend.
+  Por qué: servir páginas que pueden requerir renderizado inicial o SEO.
+
+- `media/`, `downloaded_files/`, `logos/`:
+  Qué: assets, logos de equipos y descargas temporales.
+  Para qué: soportar la UI y pruebas offline.
+  Por qué: separar contenido estático de código.
+
+- `tests/` & `pytest.ini`:
+  Qué: pruebas unitarias/funcionales para pipelines, entity resolution, mapeos y null handling.
+  Para qué: validar transformaciones y evitar regresiones.
+  Por qué: calidad y confianza en resultados del pipeline.
+
+- Archivos auxiliares en raíz:
+  - `Dockerfile`, `docker-compose.yml` -> despliegue.
+  - `README.md` -> documentación general y comandos de arranque.
+  - `requirements.txt` -> dependencias Python (lista librerías principales en el encabezado de este documento).
+  - `arrancar.py`, `bootstrap_espn.py`, `poblar_bd_normalizada.py`, `repoblar_bd.py`, `populate_daily_schedule.py` -> utilidades y bootstrappers para ingesta y repoblado de la BD.
+
+Razón general de la arquitectura
+--------------------------------
+- Separación de responsabilidades: web (Django) vs pipeline (src/scripts) vs UI (frontend).
+- Asincronía y resiliencia: Celery + Redis para ETL y tareas pesadas; retries/backoff para tolerancia.
+- Rendimiento en inferencia: ModelRegistry para cachear modelos PyTorch y evitar latencias por I/O.
+- Reproducibilidad: Docker + docker-compose + requirements para entornos reproducibles.
+- Escalabilidad: diseño pensado para desplegar web y workers por separado (Gunicorn + Celery workers).
+
+Sugerencias rápidas (si quieres que continúe)
+--------------------------------------------
+- Genero un README más detallado por módulo (con comandos de arranque). 
+- Creo un documento `ARCHITECTURE.md` con diagramas y flujos (ETL, inferencia, despliegue).
+- Listo un script `dev_setup.sh` / `dev_setup.ps1` para levantar el entorno local con Docker.
+
+Fin del resumen.

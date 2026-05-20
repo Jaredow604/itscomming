@@ -13,10 +13,13 @@ class SoccerDataClient:
     desde FBref utilizando la librería soccerdata.
     """
 
-    def __init__(self, seasons=["2324", "2425", "2526"]):
+    def __init__(self, seasons=None):
         """
         Inicializa el cliente estableciendo el objetivo en las 5 grandes ligas
         de Europa y la combinada.
+
+        Args:
+            seasons: Lista de temporadas. Default: ["2324", "2425", "2526"]
         """
         self.target_leagues = [
             'ENG-Premier League',
@@ -27,15 +30,13 @@ class SoccerDataClient:
             'Big 5 European Leagues Combined',
             'MEX-Liga MX'
         ]
-        
-        # Type casting a lista para consistencia en el iterador de FBref
-        seasons_list = [seasons] if isinstance(seasons, str) else seasons
-        
-        # Inicialización del cliente sin manejo de errores para exponer fallas críticas de I/O
+
+        seasons_list = seasons if seasons is not None else ["2324", "2425", "2526"]
+        seasons_list = [seasons_list] if isinstance(seasons_list, str) else seasons_list
 
         logger.info("Iniciando conexión con FBref... (Esto puede tardar unos segundos)")
         self.fbref = sd.FBref(
-            leagues=self.target_leagues, 
+            leagues=self.target_leagues,
             seasons=seasons_list
         )
         logger.info("SoccerDataClient inicializado correctamente con FBref.")
@@ -149,7 +150,7 @@ class SoccerDataClient:
 
 class MatchHistoryScraper:
     def __init__(self):
-        self.db_url = "postgresql://postgres:Jk9oe@localhost:5432/itscoming_db"
+        self.db_url = os.getenv("DB_URL", "postgresql://postgres:Jk9oe@localhost:5432/itscoming_db")
         self.engine = create_engine(self.db_url)
         self.ligas = ['ENG-Premier League', 'ESP-La Liga', 'GER-Bundesliga', 'ITA-Serie A', 'FRA-Ligue 1']
         self.temporadas = ['2122', '2223', '2324', '2425', '2526']

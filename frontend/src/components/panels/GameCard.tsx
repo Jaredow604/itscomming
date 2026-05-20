@@ -1,13 +1,12 @@
 import { motion } from 'framer-motion';
 import { Clock, TrendingUp } from 'lucide-react';
 import type { DailyGame, Sport } from '../../types';
-import {TeamLogo} from '../ui/TeamLogo';
+import TeamLogo from '../ui/TeamLogo';
 
 interface GameCardProps {
   game: DailyGame;
   index: number;
   isDark: boolean;
-  onChat?: (message: string) => void;
 }
 
 const SPORT_EMOJI: Record<Sport, string> = {
@@ -22,7 +21,7 @@ const SPORT_BADGE: Record<Sport, string> = {
   soccer: 'bg-emerald-500/15 text-emerald-600 dark:bg-emerald-400/15 dark:text-emerald-400',
 };
 
-export default function GameCard({ game, index, onChat }: GameCardProps) {
+export default function GameCard({ game, index }: GameCardProps) {
   const confidenceColor =
     game.confidence_pct >= 75
       ? 'text-emerald-500'
@@ -31,9 +30,7 @@ export default function GameCard({ game, index, onChat }: GameCardProps) {
       : 'text-slate-400';
 
   const handleClick = () => {
-    if (onChat) {
-      onChat(`${game.home_team} vs ${game.away_team}`);
-    }
+    window.location.href = `/?autoChat=${encodeURIComponent(`Analiza el partido ${game.home_team} vs ${game.away_team}`)}`;
   };
 
   return (
@@ -60,7 +57,7 @@ export default function GameCard({ game, index, onChat }: GameCardProps) {
         {/* Matchup with Logos */}
         <div className="flex items-center justify-between gap-2 mb-3">
           <div className="flex flex-col items-center flex-1 text-center group-hover:transform group-hover:scale-105 transition-transform duration-300">
-            <TeamLogo teamName={game.home_team} size="lg" className="mb-2" />
+            <TeamLogo url={game.home_logo_url} name={game.home_team} size="lg" className="mb-2" />
             <p className="text-[11px] font-semibold text-slate-700 dark:text-slate-200 leading-tight group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors">
               {game.home_team}
             </p>
@@ -69,7 +66,7 @@ export default function GameCard({ game, index, onChat }: GameCardProps) {
             <span className="text-[10px] font-bold text-slate-300 dark:text-slate-600 bg-slate-100 dark:bg-white/5 px-2 py-1 rounded-full">VS</span>
           </div>
           <div className="flex flex-col items-center flex-1 text-center group-hover:transform group-hover:scale-105 transition-transform duration-300">
-            <TeamLogo teamName={game.away_team} size="lg" className="mb-2" />
+            <TeamLogo url={game.away_logo_url} name={game.away_team} size="lg" className="mb-2" />
             <p className="text-[11px] font-semibold text-slate-700 dark:text-slate-200 leading-tight group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors">
               {game.away_team}
             </p>

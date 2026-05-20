@@ -73,7 +73,7 @@ class Scores365Client:
 
         logger.debug(f"Pidiendo endpoint REST: {url} | Params: {final_params}")
         
-        with httpx.Client(headers=self.headers, timeout=self.timeout, http2=True) as client:
+        with httpx.Client(headers=self.headers, timeout=self.timeout) as client:
             response = client.get(url, params=final_params)
             response.raise_for_status()
             return response.json()
@@ -100,32 +100,26 @@ class Scores365Client:
         valid_games = []
 
         try:
-            async with httpx.AsyncClient(http2=True) as client:
-                # AQUÍ es donde se define 'response'
+            async with httpx.AsyncClient() as client:
                 response = await client.get(
-                    endpoint, 
-                    headers=self.headers, 
-                    params=params, 
+                    endpoint,
+                    headers=self.headers,
+                    params=params,
                     timeout=15.0
                 )
                 response.raise_for_status()
-                
-                # Ahora sí, extraemos el JSON con seguridad
+
                 data = response.json()
-                
-                # Iniciamos nuestro filtro láser
+
                 for game in data.get('games', []):
                     comp_id = game.get('competitionId')
                     game_id = game.get('id')
-                    
-                    # 1. Filtro primario: ¿Es NBA (103) o MLB (438)?
+
                     if comp_id in self.target_competitions:
-                        
-                        
-                        
+
                         home = game.get('homeCompetitor', {}).get('name', 'Local')
                         away = game.get('awayCompetitor', {}).get('name', 'Visita')
-                            
+
                         logging.info(f" Match identificado: {home} vs {away} (Liga: {comp_id}, ID: {game_id})")
                         valid_games.append(game_id)
                             

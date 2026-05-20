@@ -22,7 +22,8 @@ from predicciones.api_views import (
     TodayGamesAPIView,
     BestPicksAPIView,
     TeamStatsAPIView,
-    PlayerPropsAPIView
+    PlayerPropsAPIView,
+    StandingsAPIView,
 )
 from predicciones.chat_views import ChatAPIView
 
@@ -73,6 +74,11 @@ urlpatterns = [
         'api/v1/player-props/',
         PlayerPropsAPIView.as_view(),
         name='player-props',
+    ),
+    path(
+        'api/v1/standings/',
+        StandingsAPIView.as_view(),
+        name='standings',
     ),
 ]
 

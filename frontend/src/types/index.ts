@@ -51,6 +51,40 @@ export interface SoccerPrediction {
   favored: 'home' | 'draw' | 'away';
 }
 
+/** Alternative line for a specific market */
+export interface AltLine {
+  line: number;
+  over_prob: number;
+  under_prob: number;
+}
+
+/** Alternative lines market (cards, corners, SOT) */
+export interface AltLineMarket {
+  line: number;
+  over_prob: number;
+  under_prob: number;
+  expected: number;
+  alt_lines: AltLine[];
+}
+
+/** All alternative lines payload */
+export interface AltLinesPayload {
+  cards: AltLineMarket;
+  corners: AltLineMarket;
+  shots_on_target: AltLineMarket;
+}
+
+/** Player prop prediction */
+export interface PlayerProp {
+  player: string;
+  team: string;
+  prop: string;
+  line: number;
+  over_prob: number;
+  under_prob: number;
+  ev: string;
+}
+
 /** Widget data payload embedded in bot response */
 export interface WidgetPayload {
   sport: 'nba' | 'mlb' | 'soccer';
@@ -58,6 +92,8 @@ export interface WidgetPayload {
   away_team: string;
   start_time: string;
   prediction: NBAPrediction | MLBPrediction | SoccerPrediction;
+  alt_lines?: AltLinesPayload;
+  player_props?: PlayerProp[];
   elo_trend: EloTrend;
   h2h_stats: H2HStat[];
 }
@@ -94,6 +130,8 @@ export interface DailyGame {
   sport: Sport;
   home_team: string;
   away_team: string;
+  home_logo_url?: string;
+  away_logo_url?: string;
   start_time: string;
   prediction: NBAPrediction | MLBPrediction | SoccerPrediction;
   confidence_pct: number;
@@ -109,6 +147,8 @@ export interface PickRecord {
   sport: Sport;
   home_team: string;
   away_team: string;
+  home_logo_url?: string;
+  away_logo_url?: string;
   start_time?: string;
   pick_type: string;
   pick_value: string;
@@ -130,6 +170,7 @@ export interface PicksResponse {
 /** Team stats from API */
 export interface TeamStatsEntry {
   name: string;
+  logo_url?: string;
   prom_goles: number;
   prom_tiros_puerta: number;
   prom_corners: number;
@@ -138,6 +179,7 @@ export interface TeamStatsEntry {
 /** Team detail with match info */
 export interface TeamDetail {
   name: string;
+  logo_url?: string;
   prom_goles: number;
   prom_tiros_puerta: number;
   prom_corners: number;
@@ -168,4 +210,82 @@ export interface LeagueConfig {
   label: string;
   sport: Sport | 'all';
   icon: string;
+}
+
+/** Standing entry for a league table */
+export interface LeagueStanding {
+  team_id: number;
+  team_name: string;
+  logo_url: string;
+  played: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  goals_for: number;
+  goals_against: number;
+  goal_diff: number;
+  points: number;
+}
+
+/** Standings API response */
+export interface StandingsResponse {
+  standings: LeagueStanding[];
+  league: string;
+  season?: string;
+  available_seasons?: string[];
+}
+
+/** Player prop market (single betting line) */
+export interface PlayerPropMarket {
+  market: string;
+  line: number;
+  casino_odds: number;
+  projected: number;
+  over_prob: number;
+  under_prob: number;
+  ev_pct: number;
+  recommendation: 'OVER' | 'UNDER' | 'NO BET';
+  confidence: 'high' | 'medium' | 'lean';
+}
+
+/** Player trend analytics */
+export interface PlayerTrends {
+  l5_avg: number;
+  l10_avg: number;
+  season_avg: number;
+  trend_direction: 'up' | 'down' | 'flat';
+  trend_strength: number;
+  home_avg: number;
+  away_avg: number;
+  vs_opponent_avg: number | null;
+  vs_opponent_games: number;
+  active_streak: string | null;
+  hot_cold: 'hot' | 'cold' | 'neutral';
+  last_10_values: number[];
+}
+
+/** Full player prop card with all analytics */
+export interface PlayerPropCard {
+  id: string;
+  sport: Sport;
+  player_name: string;
+  team_name: string;
+  opponent: string;
+  game_time: string;
+  photo_url?: string;
+  logo_url?: string;
+  props: PlayerPropMarket[];
+  trends: PlayerTrends;
+  primary_ev: number;
+  primary_confidence: 'high' | 'medium' | 'lean';
+}
+
+/** Player Props API response */
+export interface PlayerPropsResponse {
+  props: PlayerPropCard[];
+  summary: {
+    total: number;
+    avg_ev: number;
+    high_confidence_count: number;
+  };
 }

@@ -580,6 +580,312 @@ def _build_h2h_stats(home_team: str, away_team: str, sport: str) -> list:
 
 
 # ==========================================
+# LINEAS ALTERNATIVAS (Cards, Corners, SOT) — POISSON-BASED
+# ==========================================
+
+def _poisson_cdf(lam: float, k: int) -> float:
+    """Calcula P(X <= k) para Poisson(lam)."""
+    return sum((lam ** i) * math.exp(-lam) / math.factorial(i) for i in range(k + 1))
+
+
+def _poisson_over_prob(lam: float, line: float) -> float:
+    """Calcula P(X > line) para Poisson(lam)."""
+    floor_line = int(math.floor(line))
+    return 1.0 - _poisson_cdf(lam, floor_line)
+
+
+def _find_best_line(lam: float, candidate_lines: list[float]) -> tuple[float, float, float]:
+    """Encuentra la linea mas balanceada (over_prob mas cercano a 0.5)."""
+    best = None
+    best_diff = 999
+    for line in candidate_lines:
+        over_p = _poisson_over_prob(lam, line)
+        diff = abs(over_p - 0.5)
+        if diff < best_diff:
+            best_diff = diff
+            best = (line, over_p, 1.0 - over_p)
+    return best
+
+
+def _predict_alt_lines_soccer(home_team: str, away_team: str) -> dict:
+    """Calcula lineas alternativas para soccer usando distribucion de Poisson.
+
+    Retorna:
+    {
+        'cards': {'line': 4.5, 'over_prob': 0.62, 'under_prob': 0.38, 'alt_lines': [...]},
+        'corners': {'line': 9.5, 'over_prob': 0.55, 'under_prob': 0.45, 'alt_lines': [...]},
+        'shots_on_target': {'line': 7.5, 'over_prob': 0.58, 'under_prob': 0.42, 'alt_lines': [...]},
+    }
+    """
+    try:
+        home_prom = _get_team_promedios_soccer(home_team)
+        away_prom = _get_team_promedios_soccer(away_team)
+    except Exception:
+        home_prom = {'prom_goles': 1.3, 'prom_tiros_puerta': 4.0, 'prom_corners': 4.5}
+        away_prom = {'prom_goles': 1.1, 'prom_tiros_puerta': 3.5, 'prom_corners': 4.0}
+
+    # Obtener stats reales de cards/corners/SOT desde stats_futbol
+    try:
+        from database import SessionLocal
+        from sqlalchemy import text
+
+        session = SessionLocal()
+        try:
+            # Cards (amarillas)
+            cards_query = text("""
+                SELECT AVG(s.amarillas_local + s.amarillas_visitante) as avg_cards,
+                       AVG(s.rojas_local + s.rojas_visitante) as avg_reds
+                FROM partidos p
+                JOIN stats_futbol s ON s.id_partido = p.id_partido
+                JOIN equipos e ON e.id_equipo = p.id_local
+                WHERE e.nombre ILIKE :team
+            """)
+            h_cards = session.execute(cards_query, {'team': f'%{home_team}%'}).fetchone()
+            a_cards = session.execute(cards_query, {'team': f'%{away_team}%'}).fetchone()
+
+            avg_cards_h = float(h_cards.avg_cards) if h_cards and h_cards.avg_cards and float(h_cards.avg_cards) > 0 else 3.5
+            avg_cards_a = float(a_cards.avg_cards) if a_cards and a_cards.avg_cards and float(a_cards.avg_cards) > 0 else 3.2
+            avg_reds_h = float(h_cards.avg_reds) if h_cards and h_cards.avg_reds and float(h_cards.avg_reds) > 0 else 0.15
+            avg_reds_a = float(a_cards.avg_reds) if a_cards and a_cards.avg_reds and float(a_cards.avg_reds) > 0 else 0.12
+
+            # Corners
+            corners_query = text("""
+                SELECT AVG(s.corners_local + s.corners_visitante) as avg_corners
+                FROM partidos p
+                JOIN stats_futbol s ON s.id_partido = p.id_partido
+                JOIN equipos e ON e.id_equipo = p.id_local
+                WHERE e.nombre ILIKE :team
+            """)
+            h_corners = session.execute(corners_query, {'team': f'%{home_team}%'}).fetchone()
+            a_corners = session.execute(corners_query, {'team': f'%{away_team}%'}).fetchone()
+
+            avg_corners_h = float(h_corners.avg_corners) if h_corners and h_corners.avg_corners and float(h_corners.avg_corners) > 0 else 0
+            avg_corners_a = float(a_corners.avg_corners) if a_corners and a_corners.avg_corners and float(a_corners.avg_corners) > 0 else 0
+
+            # Shots on target
+            sot_query = text("""
+                SELECT AVG(s.tiros_puerta_local + s.tiros_puerta_visitante) as avg_sot
+                FROM partidos p
+                JOIN stats_futbol s ON s.id_partido = p.id_partido
+                JOIN equipos e ON e.id_equipo = p.id_local
+                WHERE e.nombre ILIKE :team
+            """)
+            h_sot = session.execute(sot_query, {'team': f'%{home_team}%'}).fetchone()
+            a_sot = session.execute(sot_query, {'team': f'%{away_team}%'}).fetchone()
+
+            avg_sot_h = float(h_sot.avg_sot) if h_sot and h_sot.avg_sot and float(h_sot.avg_sot) > 0 else 0
+            avg_sot_a = float(a_sot.avg_sot) if a_sot and a_sot.avg_sot and float(a_sot.avg_sot) > 0 else 0
+
+        finally:
+            session.close()
+    except Exception:
+        avg_cards_h, avg_cards_a = 3.5, 3.2
+        avg_reds_h, avg_reds_a = 0.15, 0.12
+        avg_corners_h, avg_corners_a = 4.5, 4.0
+        avg_sot_h, avg_sot_a = 4.0, 3.5
+
+    # Lambdas combinados (promedio de ambos equipos)
+    lam_cards = (avg_cards_h + avg_cards_a) / 2 + (avg_reds_h + avg_reds_a) / 2
+    lam_corners = (avg_corners_h + avg_corners_a) / 2
+    lam_sot = (avg_sot_h + avg_sot_a) / 2
+
+    # Tambien usar promedios de Equipos como fallback/enriquecimiento
+    h_corners_eq = home_prom.get('prom_corners', 4.5)
+    a_corners_eq = away_prom.get('prom_corners', 4.0)
+    h_sot_eq = home_prom.get('prom_tiros_puerta', 4.0)
+    a_sot_eq = away_prom.get('prom_tiros_puerta', 3.5)
+
+    # Blend inteligente: si stats_futbol tiene datos reales (>0), usar 70% stats + 30% equipos
+    # Si stats_futbol tiene zeros (ej: Liga MX sin datos), usar 100% equipos
+    corners_eq_avg = (h_corners_eq + a_corners_eq) / 2
+    sot_eq_avg = (h_sot_eq + a_sot_eq) / 2
+
+    has_corners_data = lam_corners > 1.0
+    has_sot_data = lam_sot > 1.0
+
+    lam_corners = (0.7 * lam_corners + 0.3 * corners_eq_avg) if has_corners_data else corners_eq_avg
+    lam_sot = (0.7 * lam_sot + 0.3 * sot_eq_avg) if has_sot_data else sot_eq_avg
+
+    def build_market(lam: float, lines: list[float]) -> dict:
+        line, over_p, under_p = _find_best_line(lam, lines)
+        alts = []
+        for alt_line in lines:
+            if abs(alt_line - line) > 0.01:
+                alts.append({
+                    'line': alt_line,
+                    'over_prob': round(_poisson_over_prob(lam, alt_line), 3),
+                    'under_prob': round(1 - _poisson_over_prob(lam, alt_line), 3),
+                })
+        alts.sort(key=lambda x: x['line'])
+        return {
+            'line': line,
+            'over_prob': round(over_p, 3),
+            'under_prob': round(under_p, 3),
+            'expected': round(lam, 2),
+            'alt_lines': alts[:4],
+        }
+
+    return {
+        'cards': build_market(lam_cards, [2.5, 3.5, 4.5, 5.5, 6.5]),
+        'corners': build_market(lam_corners, [7.5, 8.5, 9.5, 10.5, 11.5]),
+        'shots_on_target': build_market(lam_sot, [5.5, 6.5, 7.5, 8.5, 9.5]),
+    }
+
+
+def _consultar_player_props_enhanced(home_team: str, away_team: str, sport: str) -> tuple[str, list[dict]]:
+    """Consulta mejorada de player props con proyecciones EV.
+
+    Retorna:
+        (texto_para_llm, lista_de_props_para_widget)
+    """
+    props_list = []
+
+    try:
+        from database import SessionLocal
+        from sqlalchemy import text
+
+        session = SessionLocal()
+        try:
+            if sport == 'soccer':
+                # Obtener jugadores con stats reales de ambos equipos
+                query = text("""
+                    SELECT j.nombre, e.nombre AS team_name,
+                           j.goles, j.asistencias, j.tar_amarilla,
+                           j.tiros_totales, j.tiros_puerta, j.faltas_cometidas
+                    FROM stats_jugador_futbol j
+                    JOIN equipos e ON e.id_equipo = j.id_equipo
+                    WHERE e.nombre ILIKE :home OR e.nombre ILIKE :away
+                    ORDER BY j.goles DESC, j.tiros_puerta DESC
+                    LIMIT 8
+                """)
+                rows = session.execute(query, {'home': f'%{home_team}%', 'away': f'%{away_team}%'}).fetchall()
+
+                if rows:
+                    parts = []
+                    for r in rows:
+                        goles = r.goles or 0
+                        tiros = r.tiros_puerta or 0
+                        tarjetas = r.tar_amarilla or 0
+                        faltas = r.faltas_cometidas or 0
+
+                        # Proyeccion simplificada: si tiene goles > 0, sugerir Over 0.5
+                        goal_prob = min(goles / max(1, goles + 2), 0.85) if goles > 0 else 0.25
+                        sot_prob = min(tiros / max(1, tiros + 3), 0.80) if tiros > 0 else 0.20
+                        card_prob = min(tarjetas / max(1, tarjetas + 2), 0.75) if tarjetas > 0 else 0.15
+                        foul_card_prob = min(faltas / max(1, faltas + 4), 0.60) if faltas > 0 else 0.10
+
+                        # Calcular EV simplificado (probabilidad - implied_odds de linea 50%)
+                        goal_ev = round((goal_prob - 0.5) * 100)
+                        sot_ev = round((sot_prob - 0.5) * 100)
+                        card_ev = round((card_prob - 0.5) * 100)
+
+                        parts.append(f"{r.nombre} ({r.team_name}): {goles} goles, {tiros} SOT, {tarjetas} tarjetas")
+
+                        # Agregar props con EV positivo
+                        if goal_ev > 0:
+                            props_list.append({
+                                'player': r.nombre,
+                                'team': r.team_name,
+                                'prop': 'Goles',
+                                'line': 0.5,
+                                'over_prob': round(goal_prob, 3),
+                                'under_prob': round(1 - goal_prob, 3),
+                                'ev': f'+{goal_ev}%' if goal_ev > 0 else f'{goal_ev}%',
+                            })
+                        if sot_ev > 0:
+                            props_list.append({
+                                'player': r.nombre,
+                                'team': r.team_name,
+                                'prop': 'Tiros a Puerta',
+                                'line': 0.5,
+                                'over_prob': round(sot_prob, 3),
+                                'under_prob': round(1 - sot_prob, 3),
+                                'ev': f'+{sot_ev}%' if sot_ev > 0 else f'{sot_ev}%',
+                            })
+                        if card_ev > 0:
+                            props_list.append({
+                                'player': r.nombre,
+                                'team': r.team_name,
+                                'prop': 'Tarjetas',
+                                'line': 0.5,
+                                'over_prob': round(card_prob, 3),
+                                'under_prob': round(1 - card_prob, 3),
+                                'ev': f'+{card_ev}%' if card_ev > 0 else f'{card_ev}%',
+                            })
+
+                    if parts:
+                        return ("Jugadores clave: " + " | ".join(parts), props_list)
+
+            elif sport == 'nba':
+                query = text("""
+                    SELECT j.nombre, e.nombre AS team_name,
+                           j.puntos, j.rebotes, j.asistencias
+                    FROM stats_jugador_nba j
+                    JOIN equipos e ON e.id_equipo = j.id_equipo
+                    WHERE e.nombre ILIKE :home OR e.nombre ILIKE :away
+                    ORDER BY j.puntos DESC
+                    LIMIT 6
+                """)
+                rows = session.execute(query, {'home': f'%{home_team}%', 'away': f'%{away_team}%'}).fetchall()
+                if rows:
+                    parts = []
+                    for r in rows:
+                        pts = r.puntos or 0
+                        reb = r.rebotes or 0
+                        ast = r.asistencias or 0
+                        pts_prob = min(pts / max(1, pts + 15), 0.80) if pts > 0 else 0.30
+                        pts_ev = round((pts_prob - 0.5) * 100)
+                        parts.append(f"{r.nombre} ({r.team_name}): {pts} pts, {reb} reb, {ast} ast")
+                        if pts_ev > 0:
+                            props_list.append({
+                                'player': r.nombre, 'team': r.team_name, 'prop': 'Puntos',
+                                'line': 15.5, 'over_prob': round(pts_prob, 3),
+                                'under_prob': round(1 - pts_prob, 3),
+                                'ev': f'+{pts_ev}%' if pts_ev > 0 else f'{pts_ev}%',
+                            })
+                    if parts:
+                        return ("Jugadores clave: " + " | ".join(parts), props_list)
+
+            elif sport == 'mlb':
+                query = text("""
+                    SELECT j.nombre, e.nombre AS team_name,
+                           j.hits, j.home_runs, j.carreras_impulsadas
+                    FROM stats_jugador_mlb j
+                    JOIN equipos e ON e.id_equipo = j.id_equipo
+                    WHERE e.nombre ILIKE :home OR e.nombre ILIKE :away
+                    ORDER BY j.home_runs DESC
+                    LIMIT 6
+                """)
+                rows = session.execute(query, {'home': f'%{home_team}%', 'away': f'%{away_team}%'}).fetchall()
+                if rows:
+                    parts = []
+                    for r in rows:
+                        hits = r.hits or 0
+                        hr = r.home_runs or 0
+                        rbi = r.carreras_impulsadas or 0
+                        hit_prob = min(hits / max(1, hits + 2), 0.75) if hits > 0 else 0.35
+                        hit_ev = round((hit_prob - 0.5) * 100)
+                        parts.append(f"{r.nombre} ({r.team_name}): {hits} hits, {hr} HR, {rbi} RBI")
+                        if hit_ev > 0:
+                            props_list.append({
+                                'player': r.nombre, 'team': r.team_name, 'prop': 'Hits',
+                                'line': 0.5, 'over_prob': round(hit_prob, 3),
+                                'under_prob': round(1 - hit_prob, 3),
+                                'ev': f'+{hit_ev}%' if hit_ev > 0 else f'{hit_ev}%',
+                            })
+                    if parts:
+                        return ("Jugadores clave: " + " | ".join(parts), props_list)
+
+        finally:
+            session.close()
+    except Exception as e:
+        logger.warning("Player props enhanced fallo: %s", e)
+
+    sport_label = {'nba': 'NBA', 'mlb': 'MLB'}.get(sport, 'fútbol')
+    return (f"No hay datos de jugadores disponibles para {home_team} o {away_team} en {sport_label}.", props_list)
+
+
+# ==========================================
 # CONSULTAS DETERMINISTAS A BD (4 metricas del Oraculo) — SPORT-AWARE
 # ==========================================
 
@@ -868,6 +1174,13 @@ class ChatAPIView(APIView):
 
         h2h_stats = _build_h2h_stats(home_team, away_team, sport)
 
+        # 5b. Calcular alt_lines y player_props para el widget
+        alt_lines = _predict_alt_lines_soccer(home_team, away_team) if sport == 'soccer' else {}
+        _, player_props = _consultar_player_props_enhanced(home_team, away_team, sport)
+        # Ordenar player_props por EV (mayor primero)
+        player_props.sort(key=lambda p: float(p.get('ev', '0%').replace('%', '')), reverse=True)
+        player_props = player_props[:8]  # Top 8
+
         # 6. Generar respuesta
         reply = self._build_reply(sport, home_team, away_team, start_time, prediction, is_scheduled)
 
@@ -878,6 +1191,8 @@ class ChatAPIView(APIView):
             'away_team': away_team,
             'start_time': start_time,
             'prediction': prediction,
+            'alt_lines': alt_lines,
+            'player_props': player_props,
             'elo_trend': elo_trend,
             'h2h_stats': h2h_stats,
         }
@@ -1116,7 +1431,7 @@ class ChatAPIView(APIView):
         }
 
     def _build_reply(self, sport: str, home: str, away: str, time: str, pred: dict, is_scheduled: bool = True) -> str:
-        """Ejecuta las 4 consultas deterministas (sport-aware) y llama a Groq."""
+        """Ejecuta las 5 consultas deterministas (sport-aware) y llama a Groq."""
         try:
             res_partido = _consultar_prediccion_partido(home, away, sport)
         except Exception:
@@ -1130,9 +1445,24 @@ class ChatAPIView(APIView):
         except Exception:
             res_secundarios = "Datos no disponibles."
         try:
-            res_props = _consultar_player_props(home, away, sport)
+            res_props, _ = _consultar_player_props_enhanced(home, away, sport)
         except Exception:
             res_props = "Datos no disponibles."
+        try:
+            alt_lines = _predict_alt_lines_soccer(home, away) if sport == 'soccer' else {}
+            res_alt_lines = ""
+            if alt_lines:
+                cards = alt_lines.get('cards', {})
+                corners = alt_lines.get('corners', {})
+                sot = alt_lines.get('shots_on_target', {})
+                res_alt_lines = (
+                    f"Lineas alternativas -> "
+                    f"Cards: line {cards.get('line', '?')}, Over {cards.get('over_prob', 0):.0%} | "
+                    f"Corners: line {corners.get('line', '?')}, Over {corners.get('over_prob', 0):.0%} | "
+                    f"SOT: line {sot.get('line', '?')}, Over {sot.get('over_prob', 0):.0%}"
+                )
+        except Exception:
+            res_alt_lines = "Lineas alternativas no disponibles."
 
         # Construir modelo_info segun deporte
         if sport == 'soccer':
@@ -1167,7 +1497,8 @@ class ChatAPIView(APIView):
             f"- Equipos: {res_partido}\n"
             f"- Totales: {res_totales}\n"
             f"- Secundarios: {res_secundarios}\n"
-            f"- Player Props: {res_props}"
+            f"- Player Props: {res_props}\n"
+            f"- Alt Lines: {res_alt_lines}"
         )
 
         schedule_note = " (partido programado hoy)" if is_scheduled else " (proyección hipotética basada en stats históricos)"

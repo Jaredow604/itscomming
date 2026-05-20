@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import apiClient from '../api/client';
 import type { ChatMessage, ChatRequest, ChatResponse } from '../types';
@@ -68,6 +68,17 @@ export function useChat() {
       setIsTyping(false);
     },
   });
+
+  // --- Auto-chat from URL parameter ---
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const autoMsg = params.get('autoChat');
+    if (autoMsg && messages.length === 1) {
+      sendMessage(autoMsg);
+      // Clean URL
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
 
   // --- Send message handler ---
   const sendMessage = useCallback(

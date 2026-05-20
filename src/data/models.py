@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import List, Optional
-from sqlalchemy import ForeignKey, Numeric, DateTime, Integer, String, create_engine
+from sqlalchemy import ForeignKey, Numeric, DateTime, Integer, String, Boolean, create_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 # ==========================================
@@ -20,20 +20,18 @@ class Base(DeclarativeBase):
 class Team(Base):
     __tablename__ = 'equipos'
 
-    # ID extraído directo desde la API de 365Scores (autoincrement=False)
     id_equipo: Mapped[int] = mapped_column(primary_key=True, autoincrement=False)
     nombre: Mapped[str] = mapped_column(String(100), nullable=False)
     liga: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    
-    # Métricas y Promedios Críticos (Numeric 5,2 ideal para floats monetarios o xG)
+    logo_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+
     prom_corners: Mapped[Optional[float]] = mapped_column(Numeric(5, 2))
     prom_tiros_puerta: Mapped[Optional[float]] = mapped_column(Numeric(5, 2))
     prom_goles: Mapped[Optional[float]] = mapped_column(Numeric(5, 2))
 
-    # Relaciones (Bidireccionales)
     jugadores: Mapped[List["Player"]] = relationship(
-        back_populates="equipo", 
-        cascade="all, delete-orphan" # Si un equipo desaparece, eliminamos sus jugadores
+        back_populates="equipo",
+        cascade="all, delete-orphan"
     )
     tabla: Mapped[Optional["LeagueTable"]] = relationship(
         back_populates="equipo",
@@ -262,22 +260,59 @@ class MLMatchFeatures(Base):
     __tablename__ = 'ml_match_features'
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    league: Mapped[Optional[str]] = mapped_column(String(100))
+    season: Mapped[Optional[str]] = mapped_column(String(50))
+    date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     home_team: Mapped[Optional[str]] = mapped_column(String(100))
     away_team: Mapped[Optional[str]] = mapped_column(String(100))
-    
+    home_score: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    away_score: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+
+    home_form_gf: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
+    home_form_ga: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
+    away_form_gf: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
+    away_form_ga: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
+    home_form_xgf: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
+    home_form_xga: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
+    away_form_xgf: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
+    away_form_xga: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
+
+    total_goals: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    result: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+
     equipo_fk: Mapped[Optional[int]] = mapped_column(ForeignKey("equipos.id_equipo"), nullable=True)
     partido_fk: Mapped[Optional[int]] = mapped_column(ForeignKey("partidos.id_partido"), nullable=True)
 
     equipo: Mapped[Optional["Team"]] = relationship()
     partido: Mapped[Optional["Match"]] = relationship()
 
+
 class MatchHistoryStats(Base):
     __tablename__ = 'match_history_stats'
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    league: Mapped[Optional[str]] = mapped_column(String(100))
+    season: Mapped[Optional[str]] = mapped_column(String(50))
+    date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     home_team: Mapped[Optional[str]] = mapped_column(String(100))
     away_team: Mapped[Optional[str]] = mapped_column(String(100))
-    
+    home_score: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    away_score: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    home_xg: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
+    away_xg: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
+
+    home_form_gf: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
+    home_form_ga: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
+    away_form_gf: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
+    away_form_ga: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
+    home_form_xgf: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
+    home_form_xga: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
+    away_form_xgf: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
+    away_form_xga: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
+
+    total_goals: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    result: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+
     local_fk: Mapped[Optional[int]] = mapped_column(ForeignKey("equipos.id_equipo"), nullable=True)
     visitante_fk: Mapped[Optional[int]] = mapped_column(ForeignKey("equipos.id_equipo"), nullable=True)
     partido_fk: Mapped[Optional[int]] = mapped_column(ForeignKey("partidos.id_partido"), nullable=True)
@@ -285,6 +320,64 @@ class MatchHistoryStats(Base):
     local: Mapped[Optional["Team"]] = relationship(foreign_keys=[local_fk])
     visitante: Mapped[Optional["Team"]] = relationship(foreign_keys=[visitante_fk])
     partido: Mapped[Optional["Match"]] = relationship()
+
+
+class TeamRollingStats(Base):
+    __tablename__ = 'team_rolling_stats'
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    id_equipo: Mapped[int] = mapped_column(ForeignKey("equipos.id_equipo"))
+    fecha_calculo: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    ventana: Mapped[int] = mapped_column(Integer, default=5)
+    deporte: Mapped[str] = mapped_column(String(50), default='futbol')
+
+    prom_goles_favor: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
+    prom_goles_contra: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
+    prom_xg_favor: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
+    prom_xg_contra: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
+
+    equipo: Mapped["Team"] = relationship()
+
+
+class ScalerRegistry(Base):
+    __tablename__ = 'scaler_registry'
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    nombre: Mapped[str] = mapped_column(String(100), nullable=False)
+    ruta_archivo: Mapped[str] = mapped_column(String(500), nullable=False)
+    deporte: Mapped[str] = mapped_column(String(50), default='futbol')
+    features_entrenadas: Mapped[Optional[str]] = mapped_column(String(500))
+    n_samples_entrenamiento: Mapped[int] = mapped_column(Integer, default=0)
+    fecha_entrenamiento: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    activo: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class DailySchedule(Base):
+    __tablename__ = 'dailyschedule'
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    sport: Mapped[str] = mapped_column(String(50), nullable=False)
+    home_team: Mapped[str] = mapped_column(String(100), nullable=False)
+    away_team: Mapped[str] = mapped_column(String(100), nullable=False)
+    match_date: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    start_time: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    equipo_local_fk: Mapped[Optional[int]] = mapped_column(ForeignKey("equipos.id_equipo"), nullable=True)
+    equipo_visitante_fk: Mapped[Optional[int]] = mapped_column(ForeignKey("equipos.id_equipo"), nullable=True)
+
+    equipo_local: Mapped[Optional["Team"]] = relationship(foreign_keys=[equipo_local_fk])
+    equipo_visitante: Mapped[Optional["Team"]] = relationship(foreign_keys=[equipo_visitante_fk])
+
+
+class AliasEquipo(Base):
+    __tablename__ = 'alias_equipos'
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    nombre_fuente: Mapped[str] = mapped_column(String(200), unique=True, nullable=False)
+    id_equipo: Mapped[int] = mapped_column(ForeignKey("equipos.id_equipo"))
+
+    equipo: Mapped["Team"] = relationship()
+
 
 # ==========================================
 # MODELOS DE MACHINE LEARNING PIPELINE
@@ -300,16 +393,21 @@ class RawPlayerData(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     player_name: Mapped[str] = mapped_column(String(100))
     team_name: Mapped[str] = mapped_column(String(100))
-    
-    # Métricas Crudas
+    deporte: Mapped[str] = mapped_column(String(50), default='futbol')
+
     playing_time_min: Mapped[Optional[float]] = mapped_column(Numeric(10, 2))
     total_shots: Mapped[Optional[float]] = mapped_column(Numeric(10, 2))
     standard_sot: Mapped[Optional[float]] = mapped_column(Numeric(10, 2))
-    
-    # Target
+    xg: Mapped[Optional[float]] = mapped_column(Numeric(10, 2), nullable=True)
+    pts: Mapped[Optional[float]] = mapped_column(Numeric(10, 2), nullable=True)
+    reb: Mapped[Optional[float]] = mapped_column(Numeric(10, 2), nullable=True)
+    ast: Mapped[Optional[float]] = mapped_column(Numeric(10, 2), nullable=True)
+
     performance_gls: Mapped[Optional[float]] = mapped_column(Numeric(10, 2))
 
-    # Control de tiempos
+    jugador_fk: Mapped[Optional[int]] = mapped_column(ForeignKey("jugadores.id_jugador"), nullable=True)
+    equipo_fk: Mapped[Optional[int]] = mapped_column(ForeignKey("equipos.id_equipo"), nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
@@ -323,21 +421,26 @@ class InferenceReadyPlayerData(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     player_name: Mapped[str] = mapped_column(String(100))
     team_name: Mapped[str] = mapped_column(String(100))
+    deporte: Mapped[str] = mapped_column(String(50), default='futbol')
     photo_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     logo_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    
-    # Métricas Normalizadas (RobustScaler)
+
     playing_time_min_scaled: Mapped[Optional[float]] = mapped_column(Numeric(10, 5))
     total_shots_scaled: Mapped[Optional[float]] = mapped_column(Numeric(10, 5))
     standard_sot_scaled: Mapped[Optional[float]] = mapped_column(Numeric(10, 5))
-    
-    # Target (si existe, para backtesting)
+    xg_scaled: Mapped[Optional[float]] = mapped_column(Numeric(10, 5), nullable=True)
+    pts_scaled: Mapped[Optional[float]] = mapped_column(Numeric(10, 5), nullable=True)
+    reb_scaled: Mapped[Optional[float]] = mapped_column(Numeric(10, 5), nullable=True)
+    ast_scaled: Mapped[Optional[float]] = mapped_column(Numeric(10, 5), nullable=True)
+
     performance_gls: Mapped[Optional[float]] = mapped_column(Numeric(10, 2))
-    
-    # Referencia al origen de datos
+
     raw_data_id: Mapped[Optional[int]] = mapped_column(ForeignKey("ml_raw_player_data.id"), nullable=True)
-    
-    # Control de tiempos
+    scaler_id: Mapped[Optional[int]] = mapped_column(ForeignKey("scaler_registry.id"), nullable=True)
+
+    jugador_fk: Mapped[Optional[int]] = mapped_column(ForeignKey("jugadores.id_jugador"), nullable=True)
+    equipo_fk: Mapped[Optional[int]] = mapped_column(ForeignKey("equipos.id_equipo"), nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 # ==========================================

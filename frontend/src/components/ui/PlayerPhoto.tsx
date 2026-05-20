@@ -1,15 +1,38 @@
-import React, { useState } from 'react';
+import { useState, useMemo } from 'react';
 
 interface PlayerPhotoProps {
   url?: string;
   name: string;
   className?: string;
+  sport?: 'nba' | 'mlb' | 'soccer';
 }
 
-export default function PlayerPhoto({ url, name, className = "w-16 h-16" }: PlayerPhotoProps) {
-  const [error, setError] = useState(false);
+const ESPN_HEADSHOT_BASE = 'https://a.espncdn.com/i/headshots';
 
-  // SVG Fallback User Silhouette
+function buildEspnUrl(name: string, sport?: string): string | undefined {
+  if (!name) return undefined;
+
+  const sportKey = sport || 'nba';
+  const nameParts = name.trim().toLowerCase().split(/\s+/);
+  if (nameParts.length < 2) return undefined;
+
+  const lastName = nameParts[nameParts.length - 1];
+  const firstName = nameParts[0];
+
+  return `${ESPN_HEADSHOT_BASE}/${sportKey}/players/full/${lastName}_${firstName}.png`;
+}
+
+export default function PlayerPhoto({ url, name, className = "w-16 h-16", sport }: PlayerPhotoProps) {
+  const [fallbackPhase, setFallbackPhase] = useState<'none' | 'espn' | 'avatar'>('none');
+
+  const espnUrl = useMemo(() => buildEspnUrl(name, sport), [name, sport]);
+
+  const activeUrl = fallbackPhase === 'none'
+    ? (url || espnUrl)
+    : fallbackPhase === 'espn'
+    ? espnUrl
+    : undefined;
+
   const FallbackUser = () => (
     <div className={`${className} flex items-center justify-center bg-zinc-800 rounded-lg border border-zinc-700 overflow-hidden`} title={name}>
       <svg className="w-2/3 h-2/3 text-zinc-500 mt-2" fill="currentColor" viewBox="0 0 24 24">
@@ -18,16 +41,26 @@ export default function PlayerPhoto({ url, name, className = "w-16 h-16" }: Play
     </div>
   );
 
-  if (!url || error) {
+  if (!activeUrl || fallbackPhase === 'avatar') {
     return <FallbackUser />;
   }
 
   return (
-    <img 
-      src={url} 
-      alt={`${name} photo`} 
+    <img
+      src={activeUrl}
+      alt={`${name} photo`}
       className={`${className} object-cover rounded-lg border border-zinc-700 shadow-md`}
-      onError={() => setError(true)}
+      onError={() => {
+        if (fallbackPhase === 'none' && url) {
+          if (espnUrl) {
+            setFallbackPhase('espn');
+          } else {
+            setFallbackPhase('avatar');
+          }
+        } else if (fallbackPhase === 'espn' || (fallbackPhase === 'none' && !url)) {
+          setFallbackPhase('avatar');
+        }
+      }}
       title={name}
     />
   );

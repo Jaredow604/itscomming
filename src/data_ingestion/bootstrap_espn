@@ -1,0 +1,95 @@
+import sys
+import os
+import requests
+from sqlalchemy.orm import Session
+
+# Asegurar que el path incluya la raíz del proyecto para localizar tus módulos
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Modifica estas importaciones según los nombres de tus archivos de conexión y modelos
+from database import SessionLocal 
+from predicciones.models import Team, AliasEquipo
+
+# Configuración maestra de endpoints con prefijos aislados para evitar colisiones de IDs
+ESPN_CONFIG = [
+    {"league_name": "Premier League", "sport": "football", "prefix": 100000, "url": "https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/teams?limit=100"},
+    {"league_name": "La Liga", "sport": "football", "prefix": 100000, "url": "https://site.api.espn.com/apis/site/v2/sports/soccer/esp.1/teams?limit=100"},
+    {"league_name": "Liga MX", "sport": "football", "prefix": 100000, "url": "https://site.api.espn.com/apis/site/v2/sports/soccer/mex.1/teams?limit=100"},
+    {"league_name": "NBA", "sport": "basketball", "prefix": 200000, "url": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams?limit=100"},
+    {"league_name": "MLB", "sport": "baseball", "prefix": 300000, "url": "https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/teams?limit=100"}
+]
+
+def bootstrap_leagues_and_teams():
+    print("🚀 Iniciando inyección de entidades base y logos (ESPN -> Esquema v2.0)...")
+    db = SessionLocal()
+    total_teams_added = 0
+    
+    try:
+        for config in ESPN_CONFIG:
+            print(f"📦 Extrayendo datos para la liga: {config['league_name']}...")
+            response = requests.get(config["url"])
+            if response.status_code != 200:
+                print(f"⚠️ No se pudo conectar con el endpoint de {config['league_name']}")
+                continue
+                
+            data = response.json()
+            teams_array = data['sports'][0]['leagues'][0]['teams']
+            
+            teams_in_league = 0
+            for item in teams_array:
+                t_data = item['team']
+                espn_id = int(t_data['id'])
+                
+                # Cálculo de ID Canónico Único por Deporte (Evita duplicados PK)
+                # Fútbol: 100000+, NBA: 200000+, MLB: 300000+
+                id_canonical = config["prefix"] + espn_id
+                
+                nombre_completo = t_data.get('displayName', t_data['name'])
+                logo = t_data['logos'][0]['href'] if 'logos' in t_data and len(t_data['logos']) > 0 else None
+                
+                # Verificar persistencia previa para asegurar idempotencia
+                existing_team = db.query(Team).filter(Team.id_equipo == id_canonical).first()
+                
+                if not existing_team:
+                    # 1. Insertar la entidad raíz en 'equipos'
+                    new_team = Team(
+                        id_equipo=id_canonical,
+                        nombre=nombre_completo,
+                        liga=config["league_name"],
+                        logo_url=logo
+                    )
+                    db.add(new_team)
+                    db.flush() # Envía los datos a la BD para validar las FK antes del commit
+                    
+                    # 2. Inicializar la tabla de Alias con el nombre oficial
+                    # Esto garantiza coincidencia exacta instantánea en el pipeline ETL posterior
+                    alias_oficial = AliasEquipo(
+                        nombre_fuente=nombre_completo,
+                        id_equipo=id_canonical
+                    )
+                    db.add(alias_oficial)
+                    
+                    # 3. Guardar variantes cortas si están disponibles (ej. "Man Utd")
+                    nombre_corto = t_data.get('shortDisplayName')
+                    if nombre_corto and nombre_corto != nombre_completo:
+                        # Validar UniqueConstraint global de la tabla alias_equipos
+                        duplicate_alias = db.query(AliasEquipo).filter(AliasEquipo.nombre_fuente == nombre_corto).first()
+                        if not duplicate_alias:
+                            db.add(AliasEquipo(nombre_fuente=nombre_corto, id_equipo=id_canonical))
+                            
+                    teams_in_league += 1
+                    total_teams_added += 1
+            
+            db.commit()
+            print(f"   ✅ {teams_in_league} equipos asentados con sus alias base.")
+            
+        print(f"\n🎉 PROCESO INICIALIZADO: {total_teams_added} registros inyectados con éxito en la tabla 'equipos'.")
+        
+    except Exception as e:
+        db.rollback()
+        print(f"❌ Error crítico en el pipeline de carga: {e}")
+    finally:
+        db.close()
+
+if __name__ == "__main__":
+    bootstrap_leagues_and_teams()

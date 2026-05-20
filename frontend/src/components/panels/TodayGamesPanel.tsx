@@ -8,10 +8,9 @@ import type { Sport } from '../../types';
 interface TodayGamesPanelProps {
   sport: Sport | 'all';
   isDark: boolean;
-  onChat?: (message: string) => void;
 }
 
-export default function TodayGamesPanel({ sport, isDark, onChat }: TodayGamesPanelProps) {
+export default function TodayGamesPanel({ sport, isDark }: TodayGamesPanelProps) {
   const { data: games, isLoading, error } = useTodayGames(sport === 'all' ? undefined : sport);
 
   const today = format(new Date(), "EEEE d 'de' MMMM", { locale: es });
@@ -59,7 +58,6 @@ export default function TodayGamesPanel({ sport, isDark, onChat }: TodayGamesPan
             game={game}
             index={i}
             isDark={isDark}
-            onChat={onChat}
           />
         ))}
       </div>

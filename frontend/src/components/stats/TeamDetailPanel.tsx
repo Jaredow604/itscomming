@@ -1,6 +1,7 @@
 import { Clock, MapPin, Zap, Target, MessageSquare } from 'lucide-react';
 import FormBadge from './FormBadge';
 import MetricBarChart from './MetricBarChart';
+import TeamLogo from '../ui/TeamLogo';
 import type { TeamDetail as TeamDetailType, TeamStatsEntry } from '../../types';
 
 interface TeamDetailPanelProps {
@@ -34,15 +35,12 @@ export default function TeamDetailPanel({
   const topOpponent = otherTeams[0];
 
   return (
-    <div className="max-w-3xl mx-auto p-6 space-y-6">
+    <div className="w-full px-6 py-6 space-y-6">
       {/* ====== HEADER ====== */}
       <div className="glass-card p-6">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-brand-500 to-cyan-500
-                           flex items-center justify-center text-2xl font-bold text-white shadow-lg shadow-brand-500/20">
-              {detail.name.charAt(0)}
-            </div>
+            <TeamLogo url={detail.logo_url} name={detail.name} size="lg" className="w-14 h-14 rounded-2xl shadow-lg shadow-brand-500/20" />
             <div>
               <h1 className="text-xl font-bold text-slate-800 dark:text-white">{detail.name}</h1>
               <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
@@ -104,33 +102,37 @@ export default function TeamDetailPanel({
       </div>
 
       {/* ====== KEY METRICS ====== */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-6 gap-3">
         <MetricCard label="Goles/Juego" value={detail.prom_goles.toFixed(2)} highlight />
         <MetricCard label="Tiros a Puerta" value={detail.prom_tiros_puerta.toFixed(1)} />
         <MetricCard label="Corners/Juego" value={detail.prom_corners.toFixed(1)} />
+        <MetricCard label="Forma" value={`${form.filter((r) => r === 'W').length}W`} sub={`${form.filter((r) => r === 'D').length}D ${form.filter((r) => r === 'L').length}L`} />
+        <MetricCard label="Racha" value={form.slice(0, 3).filter((r) => r === 'W').length > 0 ? 'Activa' : 'Normal'} />
+        <MetricCard label="Nivel" value={detail.prom_goles > 1.5 ? 'Alto' : detail.prom_goles > 1.0 ? 'Medio' : 'Bajo'} />
       </div>
 
-      {/* ====== FORM ====== */}
-      <div className="glass-card p-4">
-        <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">
-          Forma Reciente (últimos 5)
-        </h3>
-        <div className="flex items-center gap-2">
-          {form.map((r, i) => (
-            <FormBadge key={i} result={r} />
-          ))}
-          <span className="ml-2 text-xs text-slate-400">
-            {form.filter((r) => r === 'W').length}W {form.filter((r) => r === 'D').length}D {form.filter((r) => r === 'L').length}L
-          </span>
+      {/* ====== FORM + BAR CHART ====== */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="glass-card p-4">
+          <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">
+            Forma Reciente (últimos 5)
+          </h3>
+          <div className="flex items-center gap-2">
+            {form.map((r, i) => (
+              <FormBadge key={i} result={r} />
+            ))}
+            <span className="ml-2 text-xs text-slate-400">
+              {form.filter((r) => r === 'W').length}W {form.filter((r) => r === 'D').length}D {form.filter((r) => r === 'L').length}L
+            </span>
+          </div>
         </div>
-      </div>
 
-      {/* ====== BAR CHART ====== */}
-      <div className="glass-card p-4">
-        <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">
-          Métricas por Partido
-        </h3>
-        <MetricBarChart data={chartData} color="#3b82f6" isDark={isDark} />
+        <div className="glass-card p-4">
+          <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">
+            Métricas por Partido
+          </h3>
+          <MetricBarChart data={chartData} color="#3b82f6" isDark={isDark} />
+        </div>
       </div>
 
       {/* ====== SUGGEST COMPARISON ====== */}
@@ -140,10 +142,7 @@ export default function TeamDetailPanel({
             Comparar con
           </h3>
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-white/10
-                           flex items-center justify-center text-xs font-bold text-slate-500">
-              {topOpponent.name.charAt(0)}
-            </div>
+            <TeamLogo url={topOpponent.logo_url} name={topOpponent.name} size="sm" className="w-8 h-8 rounded-full" />
             <div className="flex-1">
               <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{topOpponent.name}</p>
               <p className="text-[10px] text-slate-400">{topOpponent.prom_goles.toFixed(2)} goles/juego</p>
@@ -162,7 +161,7 @@ export default function TeamDetailPanel({
   );
 }
 
-function MetricCard({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+function MetricCard({ label, value, sub, highlight }: { label: string; value: string; sub?: string; highlight?: boolean }) {
   return (
     <div className={`rounded-xl px-4 py-3 text-center
       ${highlight
@@ -176,6 +175,11 @@ function MetricCard({ label, value, highlight }: { label: string; value: string;
         ${highlight ? 'text-brand-600 dark:text-brand-400' : 'text-slate-800 dark:text-white'}`}>
         {value}
       </p>
+      {sub && (
+        <p className="text-[9px] text-slate-400 dark:text-slate-500 mt-1">
+          {sub}
+        </p>
+      )}
     </div>
   );
 }
