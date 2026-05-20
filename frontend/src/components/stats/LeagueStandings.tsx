@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Loader2, Trophy, AlertCircle } from 'lucide-react';
 import TeamLogo from '../ui/TeamLogo';
 import { useStandings } from '../../hooks/useStandings';
-import type { LeagueStanding } from '../../types';
 
 const LEAGUES = [
   { key: 'premier', label: 'Premier League', icon: '🏴󠁧󠁢󠁥󠁮󠁧󠁿' },
